@@ -25,7 +25,7 @@ function App() {
 
 
   useEffect(() => {
-    mapboxgl.accessToken = "";
+    mapboxgl.accessToken = "ok";
     
 
      mapRef.current = new mapboxgl.Map({
