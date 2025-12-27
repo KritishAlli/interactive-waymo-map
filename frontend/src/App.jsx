@@ -25,7 +25,7 @@ function App() {
 
 
   useEffect(() => {
-    mapboxgl.accessToken = "pk.eyJ1Ijoia3JpYWxsaSIsImEiOiJjbWpnOWx3NnUxMGFkM2ZwcTJyNnFuODdrIn0.NjMSIQJ7akqZbeDkHkOmWg";
+    mapboxgl.accessToken = "";
     
 
      mapRef.current = new mapboxgl.Map({
