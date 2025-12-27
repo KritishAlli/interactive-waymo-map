@@ -1,4 +1,6 @@
 const express = require("express");
+require('dotenv').config();
+const ServiceArea = require('../models/ServiceArea.cjs');
 //delete later
 const turf = require("@turf/turf");
 
@@ -6,83 +8,24 @@ const router = express.Router();
 
 const { isPointInBound } = require("../services/logic.cjs");
 
-router.post("/check", (req, res) => {
+router.post("/check", async (req, res) => {
     const { long, lat } = req.body;
-    var poly = turf.polygon([
-      [
-        [
-          -118.45587021234712,
-          33.96638042114445
-        ],
-        [
-          -118.44850132286808,
-          33.957407240384654
-        ],
-        [
-          -118.38469028757214,
-          33.958317606310814
-        ],
-        [
-          -118.36038865642735,
-          33.938807628197345
-        ],
-        [
-          -118.33783074211175,
-          33.93806237333539
-        ],
-        [
-          -118.32719762524658,
-          33.95064033705699
-        ],
-        [
-          -118.32934518293735,
-          34.00541331708623
-        ],
-        [
-          -118.27913027691574,
-          34.00540433824058
-        ],
-        [
-          -118.25904697675355,
-          34.033262446859105
-        ],
-        [
-          -118.24057047780263,
-          34.02496100267825
-        ],
-        [
-          -118.22219134352639,
-          34.03100582415611
-        ],
-        [
-          -118.23317709414619,
-          34.08965573605639
-        ],
-        [
-          -118.27037808874019,
-          34.11662907180453
-        ],
-        [
-          -118.37572229453548,
-          34.09988772905554
-        ],
-        [
-          -118.46438814842509,
-          34.07352846593585
-        ],
-        [
-          -118.51026876300045,
-          34.026738560750175
-        ],
-        [
-          -118.45587021234712,
-          33.96638042114445
-        ]
-      ]
-    ]);
-    const output = isPointInBound(long, lat, poly);
-
-    res.json({ output });
+    //return all service areas
+    // await and async used because .find can take a while, so wait for this line to finish before moving on
+    const serviceAreas = await ServiceArea.find({is_active: true});
+    const out = serviceAreas[0].coordinates;
+    res.json({ serviceAreas });
 })
 
+// add service areas
+router.post("/service-areas", async (req, res) => {
+  const newArea = new ServiceArea(req.body);
+  await newArea.save();
+  res.status(201).json(newArea);  
+})
+// get all service areas
+router.get("/service-areas", async (req, res) => {
+  const serviceAreas = await ServiceArea.find({is_active: true});
+  res.json({ serviceAreas });
+})
 module.exports = router;
