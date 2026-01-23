@@ -40,3 +40,110 @@
 .read-the-docs {
   color: #888;
 }
+
+.container {
+  position: relative; 
+  width: 400px;
+  height: 400px;
+  margin: 20px auto; /* Center the container */
+  background-color: #f0f0f0; /* Light background for contrast */
+  border: 2px solid #ccc;
+}
+.map-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  flex: 1; 
+  width: 100vw;
+  min-height: 100vh;
+  border-radius: 20px;
+
+}
+.overlap {
+  position: absolute; 
+  width: 350px;
+  height: 500px;
+  display: flexbox;
+  justify-content: space-around;
+  
+  color: rgb(255, 255, 255);
+  font-weight: bold;
+  font-size: 16px;
+  border-radius: 30px; 
+  border-color: white;
+}
+
+.overlap-1 {
+  background-color: #fafafa; 
+  opacity: 100%;
+  top: 50px;
+  left: 50px;
+  height: fit-content;
+  align-content: center;
+  z-index: 1; 
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+  
+}
+.overlap-2 {
+  background-color: #fafafa; 
+  align-items: flex-end;
+  height: fit-content;
+  opacity: 100%;
+  width: 300px;
+
+  top:150px;
+  left: 75px;
+  z-index: 1; 
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+  
+}
+.overlap-3 {
+  background-color: #ffffff; 
+  align-items: flex-end;
+  height: fit-content;
+  width: 300px;
+  opacity: 100%;
+  top: 50px;
+  right: 25px;
+  z-index: 1; 
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+  
+}
+.text-block {
+  color: rgb(0, 0, 0);
+  font-weight: normal;
+  align-content: center;
+  font-size: 30px;
+  padding-top: 15px;
+}
+.small-text-block {
+  font-size: 15px;
+  font-weight: lighter;
+
+}
+
+.geocoder-container {
+  max-width: none;
+  box-shadow: none;
+  background-color: rgb(255, 255, 255);
+  border-radius: 0px;
+  right: 0px;
+}
+.button {
+  border-radius: 20px;
+  height: 40px;
+  width: 100px;
+  padding: 5px;
+
+}
+.settings-block {
+  background-color: white;
+}
+.icon {
+  color: black;
+  size: 4;
+}
+.mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--icon-search {
+  display: none !important;
+}
+

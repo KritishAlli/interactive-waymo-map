@@ -6,7 +6,7 @@ const turf = require("@turf/turf");
 
 const router = express.Router();
 
-const { isPointInBound } = require("../services/logic.cjs");
+const { isPointInBound , getDistance, isPointInAnyBound, getClosestPolygonPoint, getMidpoint, getTwoPointDistance} = require("../services/logic.cjs");
 
 router.post("/check", async (req, res) => {
     const { long, lat } = req.body;
@@ -27,5 +27,29 @@ router.post("/service-areas", async (req, res) => {
 router.get("/service-areas", async (req, res) => {
   const serviceAreas = await ServiceArea.find({is_active: true});
   res.json({ serviceAreas });
+})
+router.post("/check-point", async (req, res) => {
+  const { long, lat } = req.body;
+  const serviceAreas = await ServiceArea.find({}, {is_active: true, coordinates: true});
+  const coords = serviceAreas.map(area => area.coordinates);
+  const outBool = isPointInAnyBound(long, lat, coords)
+  res.json({ "point-found": outBool });
+
+})
+router.post("/closest-point", async (req, res) => {
+  const { long, lat } = req.body;
+  const serviceAreas = await ServiceArea.find({}, {is_active: true, coordinates: true});
+  const coords = serviceAreas.map(area => area.coordinates);
+  const result = getClosestPolygonPoint(long, lat, coords);
+
+  res.json({ "closest-point": result[0], "closest-poly": result[1] });
+
+})
+router.post("/midpoint", async (req, res) => {
+  const { coordArr1, coordArr2 } = req.body;
+  const midpoint = getMidpoint(coordArr1, coordArr2);
+  const distance = getTwoPointDistance(coordArr1, coordArr2);
+  res.json({ "midpoint": midpoint, "distance": distance});
+
 })
 module.exports = router;
