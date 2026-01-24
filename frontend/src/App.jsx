@@ -184,7 +184,7 @@ function App() {
   }
 
   useEffect(() => {
-    mapboxgl.accessToken = apiKey;
+    mapboxgl.accessToken = API_KEY;
     
 
      mapRef.current = new mapboxgl.Map({
