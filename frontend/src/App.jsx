@@ -196,11 +196,11 @@ function App() {
 
 
     mapRef.current.on('load', async () => {
+      console.log(API_URL);
 
-      const res = await fetch(`${API_URL}api/service-areas`);
+      const res = await fetch(`${API_URL}/api/service-areas`);
   
       const data = await res.json();
-      console.log(data.serviceAreas[0]);
 
 
       // Add a data source containing GeoJSON data.
