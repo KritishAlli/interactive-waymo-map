@@ -3,17 +3,12 @@ import mapboxgl, { Marker } from "mapbox-gl";
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
-import MapboxDirections from '@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions';
 import '@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions.css';
 import './App.css'
+const apiKey = import.meta.env.VITE_APP_MAPBOX_API_KEY;
+const apiUrl = import.meta.env.VITE_APP_API_URL;
 import { Field, Fieldset, Input, Label, Legend, Select, Textarea, Button, Tab, TabGroup, TabList,Menu, MenuButton, MenuItem, MenuItems} from '@headlessui/react'
-import {
-  ArchiveBoxXMarkIcon,
-  ChevronDownIcon,
-  PencilIcon,
-  Square2StackIcon,
-  TrashIcon,
-} from '@heroicons/react/16/solid'
+
 
 function App() {
 
@@ -201,7 +196,7 @@ function App() {
   }
 
   useEffect(() => {
-    mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_API_KEY;
+    mapboxgl.accessToken = apiKey;
     
 
      mapRef.current = new mapboxgl.Map({
