@@ -184,6 +184,7 @@ function App() {
   }
 
   useEffect(() => {
+    document.title = "Waymo Service Areas";
     mapboxgl.accessToken = API_KEY;
     
 
