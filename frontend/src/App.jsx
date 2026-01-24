@@ -5,25 +5,13 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 import '@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions.css';
 import './App.css'
-const apiKey = import.meta.env.VITE_APP_MAPBOX_API_KEY;
-const apiUrl = import.meta.env.VITE_APP_API_URL;
+const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
+const API_URL = import.meta.env.VITE_APP_API_URL;
 import { Field, Fieldset, Input, Label, Legend, Select, Textarea, Button, Tab, TabGroup, TabList,Menu, MenuButton, MenuItem, MenuItems} from '@headlessui/react'
 
 
 function App() {
 
-  async function testBackend() {
-    const res = await fetch("http://localhost:3001/api/check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({long: -118.439789907, lat: 34.06999972}),
-
-    });
-    
-
-    const data = await res.json();
-    alert (JSON.stringify(data));
-  }
 
   const mapRef = useRef()
   const mapContainerRef = useRef()
@@ -35,7 +23,7 @@ function App() {
 
 
   async function isInsideBounds(long, lat) {
-    const res = await fetch("http://localhost:3001/api/check-point", {
+    const res = await fetch(`${API_URL}/api/check-point`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({long: long, lat: lat}),
@@ -61,7 +49,7 @@ function App() {
     if (currentDistancePopupRef.current) {
       currentDistancePopupRef.current.remove();
     }
-    const res = await fetch("http://localhost:3001/api/midpoint", {
+    const res = await fetch(`${API_URL}/api/midpoint`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({coordArr1: coordArr1, coordArr2: coordArr2}),
@@ -94,7 +82,7 @@ function App() {
   }
   async function getClosestPointLine(long, lat) {
 
-    const res = await fetch("http://localhost:3001/api/closest-point", {
+    const res = await fetch(`${API_URL}/api/closest-point`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({long: long, lat: lat}),
@@ -209,7 +197,7 @@ function App() {
 
     mapRef.current.on('load', async () => {
 
-      const res = await fetch("http://localhost:3001/api/service-areas");
+      const res = await fetch(`${API_URL}api/service-areas`);
   
       const data = await res.json();
       console.log(data.serviceAreas[0]);
