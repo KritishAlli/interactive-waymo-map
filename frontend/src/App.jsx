@@ -3,7 +3,7 @@ import mapboxgl, { Marker } from "mapbox-gl";
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
-import '@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions.css';
+
 import './App.css'
 const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
 const API_URL = import.meta.env.VITE_APP_API_URL;
