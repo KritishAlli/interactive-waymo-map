@@ -310,8 +310,9 @@ function App() {
       {
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100vh',
-        maxWidth: '100vw',
+        minHeight: '100dvh',
+        maxWidth: '100%',
+        position: 'relative'
 
       }
     }>
