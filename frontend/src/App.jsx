@@ -319,7 +319,7 @@ function App() {
       
       <div className='map-container' ref={mapContainerRef}>
 
-            <Fieldset className="overlap overlap-1">
+            <Fieldset className="overlap title-card">
               <Legend className="text-block">Waymo Service Areas</Legend>
               <Label className={"text-block small-text-block"}>an interactive map.</Label>
               <Field>
@@ -330,9 +330,9 @@ function App() {
             
       </div>
 
-      <Fieldset className="overlap overlap-2">
+      <Fieldset >
 
-          <Field>
+          <Field className="overlap locations-card">
 
                 <Button className="button" onClick={() => viewLocation("LA")}>LA</Button>
                 <Button className="button" onClick={() => viewLocation("SF")}>SF</Button>
@@ -342,7 +342,7 @@ function App() {
           
         </Fieldset>
       
-      <Fieldset className={"overlap overlap-3"}>
+      <Fieldset className={"overlap search-card"}>
       <div className='geocoder-container' ref={geocoderContainerRef}></div>
 
 

@@ -75,8 +75,8 @@
   border-color: white;
 }
 
-.overlap-1 {
-  background-color: #fafafa; 
+.title-card {
+  background-color: #ffffff; 
   opacity: 100%;
   top: clamp(12px, 3vw, 50px);
   left: clamp(12px, 3vw, 50px);
@@ -86,15 +86,18 @@
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
   
 }
-.overlap-2 {
-  background-color: #fafafa; 
-  align-items: flex-end;
+.locations-card {
+  background-color: #ffffff; 
+  align-items: center;
   height: fit-content;
   opacity: 100%;
   width: min(350px, calc(100vw - 32px));
   display: flex;
   flex-wrap: wrap;
+  flex-direction: row;
+  
   gap: 8px;
+  padding: 8px 0;
   justify-content: center;
 
   top: clamp(150px, 3vw, 150px);
@@ -103,7 +106,7 @@
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
   
 }
-.overlap-3 {
+.search-card {
   background-color: #ffffff; 
   height: fit-content;
   width: 300px;
@@ -113,6 +116,7 @@
   z-index: 1; 
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
   justify-content: stretch;
+  border-radius: 15px; 
   
 }
 .text-block {
@@ -168,7 +172,7 @@
   }
 
   /* search box: full-width strip at the top */
-  .overlap-3 {
+  .search-card {
     top: 12px;
     left: 12px;
     right: 12px;
@@ -178,39 +182,47 @@
   }
 
   /* title: just below the search box */
-  .overlap-1 {
-    top: 84px;
+  .title-card {
+    top: auto;
+    bottom: 16px;
     left: 12px;
     right: auto;
     overflow-y: auto;
   }
 
   /* city buttons: centered along the bottom */
-  .overlap-2 {
+  .locations-card {
     top: auto;
     bottom: 16px;
-    left: 50%;
-    right: auto;
+    left: auto;
+    right: 16px;
     width: auto;
-    transform: translateX(-50%);
+    flex-direction: column;
+    padding: 8px;
+
   }
 
   .text-block { font-size: clamp(20px, 5vw, 30px); }
+  .small-text-block { font-size: clamp(20px, 5vw, 15px); }
 }
 
 /* Phones */
 
 @media (max-width: 480px) {
-  .overlap-1 { display: none; }          /* decorative — reclaim space */
+  .title-card { display: none; }          /* decorative — reclaim space */
 
-  .overlap-2 { bottom: 12px; }
-  .overlap-3 { top: 8px; left: 8px; right: 8px; }
+  .locations-card { 
+    bottom: 12px; 
+    
+    
+  }
+  .search-card { top: 8px; left: 8px; right: 8px; }
 
-  .overlap-2 .button {
-    width: auto;
+  .locations-card .button {
+    width: 100%;
     min-width: 84px;
     min-height: 44px;                     /* iOS touch-target minimum */
-    flex: 1 1 auto;
+
   }
 }
 
