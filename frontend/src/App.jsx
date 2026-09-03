@@ -9,8 +9,27 @@ const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
 const API_URL = import.meta.env.VITE_APP_API_URL;
 import { Field, Fieldset, Input, Label, Legend, Select, Textarea, Button, Tab, TabGroup, TabList,Menu, MenuButton, MenuItem, MenuItems} from '@headlessui/react'
 
+// Render's free plan spins the backend down after inactivity; the first request
+// triggers a cold start that can take 30-60s. Poll /health until it answers 200.
+async function waitForBackend({ timeoutMs = 90000, intervalMs = 2000 } = {}) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`${API_URL}/health`, { cache: "no-store" });
+      if (res.ok) return true;
+    } catch {
+      // network error = still cold starting, keep trying
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return false;
+}
+
 
 function App() {
+
+  const [backendReady, setBackendReady] = useState(false);
+  const [backendTimedOut, setBackendTimedOut] = useState(false);
 
 
   const mapRef = useRef()
@@ -184,6 +203,16 @@ function App() {
   }
 
   useEffect(() => {
+    let cancelled = false;
+    waitForBackend().then((ok) => {
+      if (cancelled) return;
+      if (ok) setBackendReady(true);
+      else setBackendTimedOut(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     document.title = "Waymo Service Areas";
     mapboxgl.accessToken = API_KEY;
     
@@ -199,8 +228,10 @@ function App() {
     mapRef.current.on('load', async () => {
       console.log(API_URL);
 
+      // backend may still be cold-starting when the map finishes loading
+      await waitForBackend();
       const res = await fetch(`${API_URL}/api/service-areas`);
-  
+
       const data = await res.json();
 
 
@@ -316,7 +347,18 @@ function App() {
 
       }
     }>
-      
+
+      {!backendReady && (
+        <div className="loading-screen">
+          <div className="loading-spinner" />
+          <div className="loading-text">
+            {backendTimedOut
+              ? "Server is taking longer than usual… hang tight or refresh."
+              : "Waking up the server…"}
+          </div>
+        </div>
+      )}
+
       <div className='map-container' ref={mapContainerRef}>
 
             <Fieldset className="overlap title-card">

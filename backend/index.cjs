@@ -12,8 +12,18 @@ app.use(cors());
 app.use(express.json());
 
 // connect to MongoDB'
-mongoose.connect(process.env.MONGODB_CONNECTION_STRING);
-console.log('MongoDB connected');
+mongoose.connect(process.env.MONGODB_CONNECTION_STRING)
+    .then(() => console.log('MongoDB connected'))
+    .catch((err) => console.error('MongoDB connection error:', err));
+
+// readiness check — cheap, no DB query, safe to poll from the frontend loading screen
+app.get("/health", (req, res) => {
+    const dbReady = mongoose.connection.readyState === 1; // 1 = connected
+    res.status(dbReady ? 200 : 503).json({
+        status: dbReady ? "ready" : "starting",
+        uptime: process.uptime(),
+    });
+});
 
 //import router
 const router = require("./routes/check.cjs");
