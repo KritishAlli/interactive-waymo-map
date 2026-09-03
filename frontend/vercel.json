@@ -1,0 +1,6 @@
+{
+    "rewrites": [
+      { "source": "/api/:path*", "destination": "https://interactive-waymo-map.onrender.com/api/:path*" },
+      { "source": "/health", "destination": "https://interactive-waymo-map.onrender.com/health" }
+    ]
+  }
