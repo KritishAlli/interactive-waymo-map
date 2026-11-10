@@ -1,0 +1,25 @@
+# Render's free plan sleeps the backend after ~15 min without traffic, and waking it
+# takes 15+ seconds. Ping /health every 10 minutes so it stays awake.
+name: Keep backend awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # allow a manual run from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /health
+        run: |
+          # retry for up to ~2 min in case it was already asleep and is cold-starting
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://interactive-waymo-map.onrender.com/health || true)
+            echo "attempt $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "backend did not return 200"
+          exit 1
