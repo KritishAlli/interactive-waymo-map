@@ -20,6 +20,8 @@ function toLocalInputValue(date) {
     `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+const isNarrowScreen = () => window.matchMedia('(max-width: 768px)').matches;
+
 async function waitForBackend({ timeoutMs = 90000, intervalMs = 2000 } = {}) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -63,6 +65,63 @@ function App() {
   const dropoffGeocoderRef = useRef();
   const routeMarkersRef = useRef([]);
   const areasRef = useRef(null); // service areas prepared for client-side geometry (geo.js)
+  const [pickupLabel, setPickupLabel] = useState("");
+  const [dropoffLabel, setDropoffLabel] = useState("");
+
+  // mobile: the search card is a pull-down sheet that can be swiped up out of the way
+  const [sheetOpen, setSheetOpen] = useState(true);
+  const sheetRef = useRef();
+  const sheetDragRef = useRef(null);
+
+  function onSheetTouchStart(e) {
+    if (!isNarrowScreen()) return;
+    const el = sheetRef.current;
+    const onGrabber = e.target.closest('.sheet-grabber, .sheet-summary');
+    // leave text fields, suggestion lists and the clock dial alone; when the sheet
+    // scrolls, only the grabber drags it so scrolling still works
+    if (!onGrabber) {
+      if (e.target.closest('input, textarea, .suggestions, .dtp-face')) return;
+      if (el.scrollHeight > el.clientHeight + 1) return;
+    }
+    const t = e.touches[0];
+    sheetDragRef.current = { x: t.clientX, y: t.clientY, dy: 0, active: false };
+  }
+
+  function onSheetTouchMove(e) {
+    const d = sheetDragRef.current;
+    if (!d) return;
+    const t = e.touches[0];
+    const dx = t.clientX - d.x;
+    const dy = t.clientY - d.y;
+    if (!d.active) {
+      if (Math.abs(dy) < 8) return;
+      if (Math.abs(dx) > Math.abs(dy)) { sheetDragRef.current = null; return; }
+      d.active = true;
+      sheetRef.current.style.transition = 'none';
+    }
+    d.dy = dy;
+    // follow the finger toward the next state, resist the other way
+    const el = sheetRef.current;
+    const offset = sheetOpen
+      ? (dy < 0 ? Math.max(dy, -el.offsetHeight * 0.6) : dy * 0.15)
+      : (dy > 0 ? Math.min(dy * 0.4, 60) : dy * 0.15);
+    el.style.transform = `translateY(${offset}px)`;
+  }
+
+  function onSheetTouchEnd() {
+    const d = sheetDragRef.current;
+    sheetDragRef.current = null;
+    if (!d?.active) return;
+    const el = sheetRef.current;
+    el.style.transition = '';
+    el.style.transform = '';
+    if (sheetOpen && d.dy < -40) {
+      document.activeElement?.blur?.(); // drop the keyboard with the sheet
+      setSheetOpen(false);
+    } else if (!sheetOpen && d.dy > 30) {
+      setSheetOpen(true);
+    }
+  }
 
   async function getAreas() {
     if (!areasRef.current) {
@@ -247,10 +306,11 @@ function App() {
     const bounds = new mapboxgl.LngLatBounds(ends.pickup.original, ends.pickup.original);
     route.geometry.coordinates.forEach((c) => bounds.extend(c));
     bounds.extend(ends.dropoff.original);
-    const isNarrow = window.innerWidth <= 768;
+    const isNarrow = isNarrowScreen();
     map.fitBounds(bounds, {
+      // on mobile the sheet collapses to a one-line summary once the route is drawn
       padding: isNarrow
-        ? { top: 380, bottom: 60, left: 40, right: 120 }
+        ? { top: 130, bottom: 80, left: 40, right: 40 }
         : { top: 80, bottom: 80, left: 420, right: 420 },
       maxZoom: 15,
     });
@@ -268,6 +328,7 @@ function App() {
       if (ends.error) throw new Error(ends.error);
 
       const { route, staysInside } = await findInAreaRoute(ends.pickup.point, ends.dropoff.point, departAt, areas);
+      if (isNarrowScreen()) setSheetOpen(false); // show the route; price stays in the summary
       drawRoute(route, ends);
 
       const data = await postJSON('/api/estimate-price', {
@@ -548,12 +609,22 @@ function App() {
           placeholder,
         });
         g.addTo(container);
-        g.on('result', (e) => { onPick(e.result.center); setEstimate(null); });
-        g.on('clear', () => { onPick(null); setEstimate(null); });
+        g.on('result', (e) => { onPick(e.result.center, e.result.text || e.result.place_name); setEstimate(null); });
+        g.on('clear', () => { onPick(null, ""); setEstimate(null); });
         return g;
       };
-      pickupGeocoderRef.current = makeRouteGeocoder('Pickup address', pickupContainerRef.current, setPickup);
-      dropoffGeocoderRef.current = makeRouteGeocoder('Dropoff address', dropoffContainerRef.current, setDropoff);
+      pickupGeocoderRef.current = makeRouteGeocoder('Pickup address', pickupContainerRef.current,
+        (c, label) => { setPickup(c); setPickupLabel(label); });
+      dropoffGeocoderRef.current = makeRouteGeocoder('Dropoff address', dropoffContainerRef.current,
+        (c, label) => { setDropoff(c); setDropoffLabel(label); });
+
+      // panning the map on a phone tucks the sheet away, like most map apps
+      mapRef.current.on('dragstart', () => {
+        if (isNarrowScreen()) {
+          document.activeElement?.blur?.();
+          setSheetOpen(false);
+        }
+      });
 
 
       // when interacting/searching with the geocoder, make the map move to the point
@@ -645,7 +716,26 @@ function App() {
           
         </Fieldset>
       
-      <Fieldset className={"overlap search-card"}>
+      <Fieldset
+        ref={sheetRef}
+        className={`overlap search-card${sheetOpen ? "" : " collapsed"}`}
+        onTouchStart={onSheetTouchStart}
+        onTouchMove={onSheetTouchMove}
+        onTouchEnd={onSheetTouchEnd}
+        onTouchCancel={onSheetTouchEnd}
+      >
+        {mode === "route" && !sheetOpen && (
+          <button type="button" className="sheet-summary" onClick={() => setSheetOpen(true)}>
+            <span className="sheet-summary-route">
+              {pickupLabel || "Pickup"} → {dropoffLabel || "Dropoff"}
+            </span>
+            <span className="sheet-summary-price">
+              {estimating ? "Estimating…"
+                : estimate ? `$${estimate.low.toFixed(0)}–$${estimate.high.toFixed(0)}`
+                : "Edit"}
+            </span>
+          </button>
+        )}
         <div className="mode-toggle" role="tablist" aria-label="Mode">
           <button
             type="button"
@@ -721,6 +811,16 @@ function App() {
             </div>
           )}
         </div>
+
+        <button
+          type="button"
+          className="sheet-grabber"
+          aria-label={sheetOpen ? "Hide options" : "Show options"}
+          aria-expanded={sheetOpen}
+          onClick={() => setSheetOpen((o) => !o)}
+        >
+          <span />
+        </button>
       </Fieldset>
     
     </div>
