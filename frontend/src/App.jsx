@@ -6,6 +6,7 @@ import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 
 import './App.css'
 import DateTimePicker from './DateTimePicker.jsx'
+import { prepareAreas, snapTrip, checkRoute } from './geo.js'
 const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
 const API_URL = import.meta.env.VITE_APP_API_URL || "";
 import { Field, Fieldset, Input, Label, Legend, Select, Textarea, Button, Tab, TabGroup, TabList,Menu, MenuButton, MenuItem, MenuItems} from '@headlessui/react'
@@ -61,6 +62,16 @@ function App() {
   const pickupGeocoderRef = useRef();
   const dropoffGeocoderRef = useRef();
   const routeMarkersRef = useRef([]);
+  const areasRef = useRef(null); // service areas prepared for client-side geometry (geo.js)
+
+  async function getAreas() {
+    if (!areasRef.current) {
+      const res = await fetch(`${API_URL}/api/service-areas`);
+      const data = await res.json();
+      areasRef.current = prepareAreas(data.serviceAreas);
+    }
+    return areasRef.current;
+  }
 
   function stopDashAnimation() {
     if (dashAnimationRef.current) cancelAnimationFrame(dashAnimationRef.current);
@@ -140,7 +151,7 @@ function App() {
 
   // Find the fastest route that stays inside the service area. If none of Mapbox's
   // alternatives do, tell it to avoid the spots where the best one leaves and ask again.
-  async function findInAreaRoute(from, to, when) {
+  async function findInAreaRoute(from, to, when, areas) {
     const MAX_ATTEMPTS = 6;
     const MAX_EXCLUDES = 50; // Mapbox limit
     let excludes = [];
@@ -154,11 +165,8 @@ function App() {
         if (!best) throw err;
         break; // excludes made the trip unroutable; fall back to the best so far
       }
-      const round = (c) => [Math.round(c[0] * 1e5) / 1e5, Math.round(c[1] * 1e5) / 1e5];
-      const { results } = await postJSON('/api/route-check', {
-        routes: routes.map((r) => r.geometry.coordinates.map(round)),
-      });
-      const candidates = routes.map((route, i) => ({ route, ...results[i] }));
+      // checked in the browser: a few ms, vs. seconds round-tripping to the free-tier backend
+      const candidates = routes.map((route) => ({ route, ...checkRoute(route.geometry.coordinates, areas) }));
 
       const inside = candidates.filter((c) => c.inside).sort((x, y) => x.route.duration - y.route.duration);
       if (inside.length) return { route: inside[0].route, staysInside: true };
@@ -255,10 +263,11 @@ function App() {
     setEstimate(null);
     clearRoute();
     try {
-      const ends = await postJSON('/api/route-endpoints', { pickup, dropoff });
+      const areas = await getAreas();
+      const ends = snapTrip(pickup, dropoff, areas);
       if (ends.error) throw new Error(ends.error);
 
-      const { route, staysInside } = await findInAreaRoute(ends.pickup.point, ends.dropoff.point, departAt);
+      const { route, staysInside } = await findInAreaRoute(ends.pickup.point, ends.dropoff.point, departAt, areas);
       drawRoute(route, ends);
 
       const data = await postJSON('/api/estimate-price', {
@@ -470,6 +479,7 @@ function App() {
       const res = await fetch(`${API_URL}/api/service-areas`);
 
       const data = await res.json();
+      areasRef.current = prepareAreas(data.serviceAreas);
 
 
       // Add a data source containing GeoJSON data.
