@@ -5,12 +5,20 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 
 import './App.css'
+import DateTimePicker from './DateTimePicker.jsx'
 const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
 const API_URL = import.meta.env.VITE_APP_API_URL || "";
 import { Field, Fieldset, Input, Label, Legend, Select, Textarea, Button, Tab, TabGroup, TabList,Menu, MenuButton, MenuItem, MenuItems} from '@headlessui/react'
 
 // Render's free plan spins the backend down after inactivity; the first request
 // triggers a cold start that can take 30-60s. Poll /health until it answers 200.
+// format a Date as the "YYYY-MM-DDTHH:mm" value a datetime-local input expects
+function toLocalInputValue(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 async function waitForBackend({ timeoutMs = 90000, intervalMs = 2000 } = {}) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -38,8 +46,235 @@ function App() {
   const geocoderContainerRef = useRef()
   const currentMarkerRef = useRef();
   const currentDistancePopupRef = useRef();
+  const dashAnimationRef = useRef();
 
+  // route price estimation mode
+  const [mode, setMode] = useState("search"); // "search" | "route"
+  const [pickup, setPickup] = useState(null);   // [lng, lat]
+  const [dropoff, setDropoff] = useState(null); // [lng, lat]
+  const [departAt, setDepartAt] = useState(() => toLocalInputValue(new Date()));
+  const [estimate, setEstimate] = useState(null);
+  const [estimateError, setEstimateError] = useState("");
+  const [estimating, setEstimating] = useState(false);
+  const pickupContainerRef = useRef();
+  const dropoffContainerRef = useRef();
+  const pickupGeocoderRef = useRef();
+  const dropoffGeocoderRef = useRef();
+  const routeMarkersRef = useRef([]);
 
+  function stopDashAnimation() {
+    if (dashAnimationRef.current) cancelAnimationFrame(dashAnimationRef.current);
+    dashAnimationRef.current = null;
+  }
+
+  // remove the single-address search marker, distance pill and dashed line
+  function clearSearchOverlays() {
+    stopDashAnimation();
+    currentMarkerRef.current?.remove();
+    currentMarkerRef.current = null;
+    currentDistancePopupRef.current?.remove();
+    currentDistancePopupRef.current = null;
+    const map = mapRef.current;
+    if (map?.getLayer('line-dashed')) map.removeLayer('line-dashed');
+    if (map?.getSource('closest-point-route')) map.removeSource('closest-point-route');
+  }
+
+  function clearRoute() {
+    routeMarkersRef.current.forEach((m) => m.remove());
+    routeMarkersRef.current = [];
+    const map = mapRef.current;
+    for (const id of ['route-line', 'route-gaps-line']) {
+      if (map?.getLayer(id)) map.removeLayer(id);
+    }
+    for (const id of ['route', 'route-gaps']) {
+      if (map?.getSource(id)) map.removeSource(id);
+    }
+  }
+
+  function switchMode(next) {
+    if (next === mode) return;
+    if (next === "route") {
+      clearSearchOverlays();
+      geocoderRef.current?.clear();
+    } else {
+      clearRoute();
+      setEstimate(null);
+      setEstimateError("");
+    }
+    setMode(next);
+  }
+
+  async function postJSON(path, body) {
+    const res = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }
+
+  // Mapbox Directions with alternatives; `excludes` are points the route must avoid.
+  // depart_at only applies to future times, so retry without it on failure.
+  async function fetchRoutes(from, to, when, excludes = []) {
+    const fmt = (c) => c.map((n) => n.toFixed(6));
+    let url = `https://api.mapbox.com/directions/v5/mapbox/driving/${fmt(from).join(',')};${fmt(to).join(',')}` +
+      `?geometries=geojson&overview=full&alternatives=true&access_token=${API_KEY}`;
+    if (excludes.length) {
+      url += `&exclude=${excludes.map((c) => `point(${fmt(c).join('%20')})`).join(',')}`;
+    }
+    const isFuture = when && new Date(when).getTime() > Date.now();
+    if (isFuture) {
+      const res = await fetch(`${url}&depart_at=${encodeURIComponent(when)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.routes?.length) return data.routes;
+      }
+    }
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok || !data.routes?.length) throw new Error(data.message || "No driving route found");
+    return data.routes;
+  }
+
+  // Find the fastest route that stays inside the service area. If none of Mapbox's
+  // alternatives do, tell it to avoid the spots where the best one leaves and ask again.
+  async function findInAreaRoute(from, to, when) {
+    const MAX_ATTEMPTS = 6;
+    const MAX_EXCLUDES = 50; // Mapbox limit
+    let excludes = [];
+    let best = null;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      let routes;
+      try {
+        routes = await fetchRoutes(from, to, when, excludes);
+      } catch (err) {
+        if (!best) throw err;
+        break; // excludes made the trip unroutable; fall back to the best so far
+      }
+      const round = (c) => [Math.round(c[0] * 1e5) / 1e5, Math.round(c[1] * 1e5) / 1e5];
+      const { results } = await postJSON('/api/route-check', {
+        routes: routes.map((r) => r.geometry.coordinates.map(round)),
+      });
+      const candidates = routes.map((route, i) => ({ route, ...results[i] }));
+
+      const inside = candidates.filter((c) => c.inside).sort((x, y) => x.route.duration - y.route.duration);
+      if (inside.length) return { route: inside[0].route, staysInside: true };
+
+      const roundBest = candidates.reduce((x, y) => (y.fractionInside > x.fractionInside ? y : x));
+      if (!best || roundBest.fractionInside > best.fractionInside) best = roundBest;
+
+      const next = roundBest.excludePoints.filter(
+        (p) => !excludes.some((e) => e[0] === p[0] && e[1] === p[1])
+      );
+      if (!next.length || excludes.length >= MAX_EXCLUDES) break;
+      excludes = [...excludes, ...next].slice(0, MAX_EXCLUDES);
+    }
+    return { route: best.route, staysInside: false };
+  }
+
+  function distancePill(miles) {
+    const el = document.createElement("div");
+    el.className = "distance-pill";
+    el.textContent = `${miles.toFixed(2)} mi`;
+    return el;
+  }
+
+  function stopDot() {
+    const el = document.createElement("div");
+    el.className = "stop-dot";
+    return el;
+  }
+
+  // route line + address pins; for addresses outside the area, a dashed line and
+  // distance pill from the address to where the Waymo actually stops
+  function drawRoute(route, ends) {
+    const map = mapRef.current;
+    clearRoute();
+    map.addSource('route', {
+      type: 'geojson',
+      data: { type: 'Feature', properties: {}, geometry: route.geometry },
+    });
+    map.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#1a73e8', 'line-width': 6, 'line-emissive-strength': 1 },
+    });
+
+    const gaps = [ends.pickup, ends.dropoff].filter((e) => !e.inArea);
+    map.addSource('route-gaps', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: gaps.map((e) => ({
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates: [e.original, e.point] },
+        })),
+      },
+    });
+    map.addLayer({
+      id: 'route-gaps-line',
+      type: 'line',
+      source: 'route-gaps',
+      layout: { 'line-cap': 'round' },
+      paint: { 'line-color': 'orange', 'line-width': 5, 'line-dasharray': [0.5, 2], 'line-emissive-strength': 1 },
+    });
+
+    const markers = [
+      new mapboxgl.Marker({ color: '#2e7d32' }).setLngLat(ends.pickup.original).addTo(map),
+      new mapboxgl.Marker({ color: '#c62828' }).setLngLat(ends.dropoff.original).addTo(map),
+    ];
+    for (const e of gaps) {
+      const mid = [(e.original[0] + e.point[0]) / 2, (e.original[1] + e.point[1]) / 2];
+      markers.push(new mapboxgl.Marker({ element: stopDot() }).setLngLat(e.point).addTo(map));
+      markers.push(new mapboxgl.Marker({ element: distancePill(e.gapMiles), anchor: 'center' }).setLngLat(mid).addTo(map));
+    }
+    routeMarkersRef.current = markers;
+
+    const bounds = new mapboxgl.LngLatBounds(ends.pickup.original, ends.pickup.original);
+    route.geometry.coordinates.forEach((c) => bounds.extend(c));
+    bounds.extend(ends.dropoff.original);
+    const isNarrow = window.innerWidth <= 768;
+    map.fitBounds(bounds, {
+      padding: isNarrow
+        ? { top: 380, bottom: 60, left: 40, right: 120 }
+        : { top: 80, bottom: 80, left: 420, right: 420 },
+      maxZoom: 15,
+    });
+  }
+
+  async function estimateRoute() {
+    if (!pickup || !dropoff) return;
+    setEstimating(true);
+    setEstimateError("");
+    setEstimate(null);
+    clearRoute();
+    try {
+      const ends = await postJSON('/api/route-endpoints', { pickup, dropoff });
+      if (ends.error) throw new Error(ends.error);
+
+      const { route, staysInside } = await findInAreaRoute(ends.pickup.point, ends.dropoff.point, departAt);
+      drawRoute(route, ends);
+
+      const data = await postJSON('/api/estimate-price', {
+        pickup: ends.pickup.point,
+        dropoff: ends.dropoff.point,
+        distanceMiles: route.distance / 1609.344,
+        durationMinutes: route.duration / 60,
+        departAt,
+      });
+      setEstimate({ ...data, ends, staysInside });
+    } catch (err) {
+      setEstimateError(err.message || "Something went wrong");
+    } finally {
+      setEstimating(false);
+    }
+  }
 
   async function isInsideBounds(long, lat) {
     const res = await fetch(`${API_URL}/api/check-point`, {
@@ -162,8 +397,10 @@ function App() {
     ];
 
     let step = 0;
+    stopDashAnimation(); // only one animation loop at a time
 
     function animateDashArray(timestamp) {
+      if (!mapRef.current?.getLayer('line-dashed')) return; // line was removed
       const newStep = parseInt((timestamp / 50) % dashArraySequence.length);
 
       if (newStep !== step) {
@@ -175,7 +412,7 @@ function App() {
         step = newStep;
       }
 
-      requestAnimationFrame(animateDashArray);
+      dashAnimationRef.current = requestAnimationFrame(animateDashArray);
     }
 
     animateDashArray(0);
@@ -291,6 +528,23 @@ function App() {
       });
       geocoderRef.current.addTo(geocoderContainerRef.current);
 
+      // route mode: pickup + dropoff search boxes (markers/route are drawn by estimateRoute)
+      const makeRouteGeocoder = (placeholder, container, onPick) => {
+        const g = new MapboxGeocoder({
+          accessToken: mapboxgl.accessToken,
+          mapboxgl: mapboxgl,
+          marker: false,
+          flyTo: false,
+          placeholder,
+        });
+        g.addTo(container);
+        g.on('result', (e) => { onPick(e.result.center); setEstimate(null); });
+        g.on('clear', () => { onPick(null); setEstimate(null); });
+        return g;
+      };
+      pickupGeocoderRef.current = makeRouteGeocoder('Pickup address', pickupContainerRef.current, setPickup);
+      dropoffGeocoderRef.current = makeRouteGeocoder('Dropoff address', dropoffContainerRef.current, setDropoff);
+
 
       // when interacting/searching with the geocoder, make the map move to the point
       geocoderRef.current.on('result' , (e) => {
@@ -325,6 +579,9 @@ function App() {
       if (geocoderRef.current) {
         geocoderRef.current.onRemove();
       }
+      pickupGeocoderRef.current?.onRemove();
+      dropoffGeocoderRef.current?.onRemove();
+      if (dashAnimationRef.current) cancelAnimationFrame(dashAnimationRef.current);
       mapRef.current.remove()
     }
   }, [])
@@ -379,9 +636,81 @@ function App() {
         </Fieldset>
       
       <Fieldset className={"overlap search-card"}>
-      <div className='geocoder-container' ref={geocoderContainerRef}></div>
+        <div className="mode-toggle" role="tablist" aria-label="Mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "search"}
+            className={`mode-tab ${mode === "search" ? "active" : ""}`}
+            onClick={() => switchMode("search")}
+          >
+            Check address
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "route"}
+            className={`mode-tab ${mode === "route" ? "active" : ""}`}
+            onClick={() => switchMode("route")}
+          >
+            Price a trip
+          </button>
+        </div>
 
+        <div className='geocoder-container' ref={geocoderContainerRef} hidden={mode !== "search"}></div>
 
+        <div className="route-panel" hidden={mode !== "route"}>
+          <div className='geocoder-container route-geocoder' ref={pickupContainerRef}></div>
+          <div className='geocoder-container route-geocoder' ref={dropoffContainerRef}></div>
+
+          <DateTimePicker
+            value={departAt}
+            onChange={(v) => { setDepartAt(v); setEstimate(null); }}
+          />
+
+          <button
+            type="button"
+            className="button estimate-button"
+            disabled={!pickup || !dropoff || estimating}
+            onClick={estimateRoute}
+          >
+            {estimating ? "Estimating…" : "Estimate price"}
+          </button>
+
+          {estimateError && <div className="route-error">{estimateError}</div>}
+
+          {estimate && (
+            <div className="route-result">
+              {estimate.ends.pickup.inArea === false && (
+                <div className="route-note">
+                  Pickup is outside the service area. Nearest Waymo pickup is {estimate.ends.pickup.gapMiles.toFixed(2)} mi away (dashed line).
+                </div>
+              )}
+              {estimate.ends.dropoff.inArea === false && (
+                <div className="route-note">
+                  Dropoff is outside the service area. Nearest Waymo dropoff is {estimate.ends.dropoff.gapMiles.toFixed(2)} mi away (dashed line).
+                </div>
+              )}
+              {!estimate.staysInside && (
+                <div className="route-warning">
+                  Couldn&apos;t find a route that stays fully inside the service area. The route shown leaves it briefly.
+                </div>
+              )}
+              <div className="route-price">
+                ${estimate.low.toFixed(0)}–${estimate.high.toFixed(0)}
+              </div>
+              <div className="route-meta">
+                {estimate.distanceMiles.toFixed(1)} mi · {Math.round(estimate.durationMinutes)} min
+                {" · "}{estimate.timeLabel}{estimate.multiplier !== 1 ? ` (×${estimate.multiplier})` : ""}
+              </div>
+              <div className="route-breakdown">
+                Base ${estimate.breakdown.base.toFixed(2)} · Distance ${estimate.breakdown.distance.toFixed(2)}
+                {" · "}Time ${estimate.breakdown.time.toFixed(2)} · Booking ${estimate.breakdown.bookingFee.toFixed(2)}
+              </div>
+              <div className="route-disclaimer">Unofficial estimate, not Waymo pricing.</div>
+            </div>
+          )}
+        </div>
       </Fieldset>
     
     </div>

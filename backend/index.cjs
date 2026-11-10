@@ -9,7 +9,7 @@ const mongoose = require("mongoose");
 const app = express();
 app.use(cors());
 //allow JSON (file type) in requests
-app.use(express.json());
+app.use(express.json({ limit: "2mb" })); // route-check posts full route geometries
 
 // connect to MongoDB'
 mongoose.connect(process.env.MONGODB_CONNECTION_STRING)
