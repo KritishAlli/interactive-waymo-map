@@ -290,8 +290,7 @@ function App() {
           mapboxgl: mapboxgl,
       });
       geocoderRef.current.addTo(geocoderContainerRef.current);
-      
-      
+
 
       // when interacting/searching with the geocoder, make the map move to the point
       geocoderRef.current.on('result' , (e) => {
@@ -314,11 +313,6 @@ function App() {
           }
 
         });
-
-
-        
-
-
 
       }
       )
@@ -354,7 +348,7 @@ function App() {
           <div className="loading-text">
             {backendTimedOut
               ? "Server is taking longer than usual… hang tight or refresh."
-              : "Waking up the server…"}
+              : "Waking up the server… est. 15 sec"}
           </div>
         </div>
       )}

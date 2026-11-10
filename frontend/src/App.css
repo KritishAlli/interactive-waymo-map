@@ -90,7 +90,9 @@
   .loading-spinner { animation-duration: 2s; }
 }
 .overlap {
-  position: absolute; 
+  /* cards are always white; keep native controls (buttons, geocoder input) in light mode */
+  color-scheme: light;
+  position: absolute;
   width: min(350px, calc(100vw - 32px));
   height: auto;
   max-height: calc(100dvh - 80px);
@@ -139,9 +141,15 @@
 .search-card {
   background-color: #ffffff; 
   height: fit-content;
-  width: 300px;
+  width: min(350px, calc(100vw - 32px));
   opacity: 100%;
   top: clamp(50px, 3vw, 150px);
+  /* reset <fieldset> defaults */
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  overflow: visible;
   right: clamp(25px, 3vw, 150px);
   z-index: 1; 
   box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
@@ -163,18 +171,41 @@
 }
 
 .geocoder-container {
-  max-width: none;
   width: 100%;
-  box-shadow: none;
   background-color: rgb(255, 255, 255);
-  border-radius: 0px;
+  border-radius: 15px;
+}
+/* fill the card; the card supplies the shadow and rounded corners */
+.geocoder-container .mapboxgl-ctrl-geocoder {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-shadow: none;
+  border-radius: 15px;
+}
+.geocoder-container .mapboxgl-ctrl-geocoder .suggestions {
+  border-radius: 12px;
 }
 .button {
+  -webkit-appearance: none;
+  appearance: none;
+  color-scheme: light;
+  background-color: #f9f9f9;
+  color: #000000;
+  border: 1px solid #d0d0d0;
+  font: inherit;
+  font-weight: bold;
+  cursor: pointer;
   border-radius: 20px;
   height: 40px;
   width: 100px;
   padding: 5px;
-
+}
+.button:hover {
+  border-color: #FF8000;
+}
+.button:active {
+  background-color: #ececec;
 }
 .settings-block {
   background-color: white;
@@ -185,6 +216,8 @@
 }
 .mapboxgl-ctrl-geocoder--input { 
   font-size: 16px; 
+  padding-left: 16px;   /* search icon is hidden, so no room needed for it */
+  padding-right: 40px;  /* room for the clear (x) button */
 }
 .mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--icon-search {
   display: none !important;
