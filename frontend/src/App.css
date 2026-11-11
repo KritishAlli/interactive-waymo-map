@@ -651,17 +651,21 @@
   }
 
   /* city shortcuts: a chip row inside the card */
+  /* one row that scrolls sideways once there are more cities than fit */
   .city-chips {
     display: flex;
     gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
+  .city-chips::-webkit-scrollbar { display: none; }
   .city-chip {
     -webkit-appearance: none;
     appearance: none;
-    flex: 1;
-    min-width: 0;
+    flex: 1 0 auto;
     min-height: 40px;
-    padding: 0 8px;
+    padding: 0 12px;
     border: 1px solid #e0e0e0;
     border-radius: 20px;
     background-color: #ffffff;

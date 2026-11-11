@@ -556,6 +556,18 @@ function App() {
         zoom: 10
       })
     }
+    if (location == "SD") {
+      mapRef.current.flyTo({
+        center: [-117.19, 32.79],
+        zoom: 10.5
+      })
+    }
+    if (location == "Dallas") {
+      mapRef.current.flyTo({
+        center: [-96.80, 32.81],
+        zoom: 10.5
+      })
+    }
   }
 
   useEffect(() => {
@@ -776,6 +788,8 @@ function App() {
                 <Button className="button" onClick={() => viewLocation("LA")}>LA</Button>
                 <Button className="button" onClick={() => viewLocation("SF")}>SF</Button>
                 <Button className="button" onClick={() => viewLocation("Phoenix")}>AZ</Button>
+                <Button className="button" onClick={() => viewLocation("SD")}>SD</Button>
+                <Button className="button" onClick={() => viewLocation("Dallas")}>DAL</Button>
           </Field>
           
           
@@ -826,9 +840,11 @@ function App() {
 
         {/* mobile only: city shortcuts live in the card instead of floating over the map */}
         <div className="city-chips" hidden={mode !== "search"}>
-          <button type="button" className="city-chip" onClick={() => viewLocation("LA")}>Los Angeles</button>
+          <button type="button" className="city-chip" onClick={() => viewLocation("LA")}>LA</button>
           <button type="button" className="city-chip" onClick={() => viewLocation("SF")}>SF Bay</button>
           <button type="button" className="city-chip" onClick={() => viewLocation("Phoenix")}>Phoenix</button>
+          <button type="button" className="city-chip" onClick={() => viewLocation("SD")}>San Diego</button>
+          <button type="button" className="city-chip" onClick={() => viewLocation("Dallas")}>Dallas</button>
         </div>
 
         <div className="route-panel" hidden={mode !== "route"}>
