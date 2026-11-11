@@ -502,6 +502,44 @@
   display: none !important;
 }
 
+/* message from the locate button (e.g. how to unblock location), above the map controls */
+.location-toast {
+  color-scheme: light;
+  position: fixed;
+  left: calc(12px + env(safe-area-inset-left));
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  max-width: 440px;
+  margin: 0 auto;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 8px 12px 14px;
+  background-color: #ffffff;
+  color: #1c1c1e;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.location-toast span { flex: 1; }
+.location-toast button {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -6px 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #555555;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* mobile sheet controls + in-card city chips: hidden on desktop */
 .sheet-grabber,
 .sheet-summary,

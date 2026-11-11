@@ -7,6 +7,7 @@ import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 import './App.css'
 import DateTimePicker from './DateTimePicker.jsx'
 import { prepareAreas, snapTrip, checkRoute } from './geo.js'
+import LocateControl from './locate.js'
 const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
 const API_URL = import.meta.env.VITE_APP_API_URL || "";
 import { Field, Fieldset, Input, Label, Legend, Select, Textarea, Button, Tab, TabGroup, TabList,Menu, MenuButton, MenuItem, MenuItems} from '@headlessui/react'
@@ -41,6 +42,7 @@ function App() {
 
   const [backendReady, setBackendReady] = useState(false);
   const [backendTimedOut, setBackendTimedOut] = useState(false);
+  const [locationMessage, setLocationMessage] = useState(null); // locate-button errors
 
 
   const mapRef = useRef()
@@ -577,20 +579,11 @@ function App() {
       
 
     }
-    mapRef.current.addControl(
-      new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true
-          
-        },
-        trackUserLocation: true,
-        showUserHeading: true
-        
-      }), 'bottom-left'
-    );
-  
     }
   );
+
+    // available right away, not only after the backend wakes up
+    mapRef.current.addControl(new LocateControl(setLocationMessage), 'bottom-left');
   
       geocoderRef.current = new MapboxGeocoder({
           accessToken: mapboxgl.accessToken,
@@ -706,6 +699,13 @@ function App() {
               ? "Server is taking longer than usual… hang tight or refresh."
               : "Waking up the server… est. 15 sec"}
           </div>
+        </div>
+      )}
+
+      {locationMessage && (
+        <div className="location-toast" role="alert">
+          <span>{locationMessage}</span>
+          <button type="button" aria-label="Dismiss" onClick={() => setLocationMessage(null)}>×</button>
         </div>
       )}
 
