@@ -8,6 +8,23 @@ import mapboxgl from 'mapbox-gl';
 
 const POSITION_OPTIONS = { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 };
 
+// One-shot position lookup. Rejects with a GeolocationPositionError-like { code, message };
+// pass the error to locationErrorMessage() for user-facing text.
+export function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) reject({ code: 'unsupported' });
+    else if (!window.isSecureContext) reject({ code: 'insecure' });
+    else navigator.geolocation.getCurrentPosition(resolve, reject, POSITION_OPTIONS);
+  });
+}
+
+export function locationErrorMessage(err) {
+  if (err?.code === 'unsupported') return "This browser can't share your location.";
+  if (err?.code === 'insecure') return 'Location only works over https (or localhost). Open the https version of this site.';
+  if (err?.code === 1) return deniedHelp();
+  return "Couldn't find your location. Check that Location Services are on and try again.";
+}
+
 function deniedHelp() {
   const ua = navigator.userAgent;
   const iOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -66,17 +83,9 @@ export default class LocateControl {
   }
 
   locate() {
-    if (!navigator.geolocation) {
-      this.onMessage("This browser can't share your location.");
-      return;
-    }
-    if (!window.isSecureContext) {
-      this.onMessage('Location only works over https (or localhost). Open the https version of this site.');
-      return;
-    }
     this.onMessage(null);
     this.setState('waiting');
-    navigator.geolocation.getCurrentPosition(
+    getPosition().then(
       (pos) => {
         if (!this.map) return;
         this.show(pos, true);
@@ -84,7 +93,6 @@ export default class LocateControl {
         this.watch();
       },
       (err) => this.fail(err),
-      POSITION_OPTIONS,
     );
   }
 
@@ -118,7 +126,6 @@ export default class LocateControl {
   fail(err) {
     if (!this.map) return;
     this.setState(this.watchId !== null ? 'active' : null);
-    if (err.code === 1) this.onMessage(deniedHelp());
-    else this.onMessage("Couldn't find your location. Check that Location Services are on and try again.");
+    this.onMessage(locationErrorMessage(err));
   }
 }

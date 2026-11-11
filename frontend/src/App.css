@@ -231,6 +231,50 @@
 }
 /* keep the focused box's suggestion list above the box below it */
 .route-geocoder:focus-within { z-index: 5; }
+.route-field:focus-within { position: relative; z-index: 5; }
+
+/* address box + "use current location" button */
+.route-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.route-field .route-geocoder { flex: 1; min-width: 0; }
+.current-location-btn {
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 38px;                 /* geocoder input (36px) + its 1px border */
+  padding: 0;
+  border: 1px solid #e0e0e0;
+  border-radius: 15px;
+  background-color: #ffffff;
+  color: #1a73e8;
+  cursor: pointer;
+}
+.current-location-btn:active:not(:disabled) { background-color: #e8f0fe; }
+.current-location-btn:disabled { cursor: default; }
+.current-location-btn:disabled:not(:has(.mini-spinner)) { color: #b0c4e8; }
+@media (hover: hover) {
+  .current-location-btn:hover:not(:disabled) { border-color: #1a73e8; }
+}
+/* the geocoder's input grows to 50px below 640px wide */
+@media (max-width: 639px) {
+  .current-location-btn { height: 52px; }
+}
+.mini-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(26, 115, 232, 0.25);
+  border-top-color: #1a73e8;
+  animation: logo-spin 0.8s linear infinite;
+}
 /* departure date/time picker */
 .dtp { display: flex; flex-direction: column; gap: 6px; font-weight: normal; }
 .dtp-label { font-size: 13px; font-weight: bold; color: #555555; padding: 0 4px; }

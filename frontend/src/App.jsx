@@ -7,7 +7,17 @@ import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 import './App.css'
 import DateTimePicker from './DateTimePicker.jsx'
 import { prepareAreas, snapTrip, checkRoute } from './geo.js'
-import LocateControl from './locate.js'
+import LocateControl, { getPosition, locationErrorMessage } from './locate.js'
+
+const CURRENT_LOCATION_LABEL = "Current location";
+
+function LocationArrowIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M21 3 3 10.5l7.5 3L13.5 21 21 3z" />
+    </svg>
+  );
+}
 const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
 const API_URL = import.meta.env.VITE_APP_API_URL || "";
 import { Field, Fieldset, Input, Label, Legend, Select, Textarea, Button, Tab, TabGroup, TabList,Menu, MenuButton, MenuItem, MenuItems} from '@headlessui/react'
@@ -69,6 +79,43 @@ function App() {
   const areasRef = useRef(null); // service areas prepared for client-side geometry (geo.js)
   const [pickupLabel, setPickupLabel] = useState("");
   const [dropoffLabel, setDropoffLabel] = useState("");
+  const [locatingFor, setLocatingFor] = useState(null); // "pickup" | "dropoff" | null
+
+  // fill the pickup or dropoff box with the device's location
+  async function pickCurrentLocation(which) {
+    setLocatingFor(which);
+    setLocationMessage(null);
+    try {
+      const pos = await getPosition();
+      const coords = [pos.coords.longitude, pos.coords.latitude];
+      const geocoder = which === "pickup" ? pickupGeocoderRef.current : dropoffGeocoderRef.current;
+      geocoder?.setInput(CURRENT_LOCATION_LABEL); // sets the text without searching
+      geocoder?._showClearButton?.(); // private API; the (x) only shows after typed searches otherwise
+      if (which === "pickup") { setPickup(coords); setPickupLabel(CURRENT_LOCATION_LABEL); }
+      else { setDropoff(coords); setDropoffLabel(CURRENT_LOCATION_LABEL); }
+      setEstimate(null);
+      document.activeElement?.blur?.();
+    } catch (err) {
+      setLocationMessage(locationErrorMessage(err));
+    } finally {
+      setLocatingFor(null);
+    }
+  }
+
+  function currentLocationButton(which) {
+    return (
+      <button
+        type="button"
+        className="current-location-btn"
+        aria-label={`Use current location as ${which}`}
+        title="Use current location"
+        disabled={locatingFor !== null}
+        onClick={() => pickCurrentLocation(which)}
+      >
+        {locatingFor === which ? <span className="mini-spinner" /> : <LocationArrowIcon />}
+      </button>
+    );
+  }
 
   // mobile: the search card is a pull-down sheet that can be swiped up out of the way
   const [sheetOpen, setSheetOpen] = useState(true);
@@ -785,8 +832,14 @@ function App() {
         </div>
 
         <div className="route-panel" hidden={mode !== "route"}>
-          <div className='geocoder-container route-geocoder' ref={pickupContainerRef}></div>
-          <div className='geocoder-container route-geocoder' ref={dropoffContainerRef}></div>
+          <div className="route-field">
+            <div className='geocoder-container route-geocoder' ref={pickupContainerRef}></div>
+            {currentLocationButton("pickup")}
+          </div>
+          <div className="route-field">
+            <div className='geocoder-container route-geocoder' ref={dropoffContainerRef}></div>
+            {currentLocationButton("dropoff")}
+          </div>
 
           <DateTimePicker
             value={departAt}
