@@ -599,7 +599,17 @@ function App() {
       });
       geocoderRef.current.addTo(geocoderContainerRef.current);
 
-      // route mode: pickup + dropoff search boxes (markers/route are drawn by estimateRoute)
+      // route mode: pickup + dropoff search boxes (markers/route are drawn by estimateRoute).
+      // On a phone, picking one address moves on to the next empty box, else drops the keyboard.
+      const advanceFocus = (container) => {
+        if (!isNarrowScreen()) return;
+        const next = [pickupContainerRef.current, dropoffContainerRef.current]
+          .filter((c) => c !== container)
+          .map((c) => c.querySelector('input'))
+          .find((input) => input && !input.value);
+        if (next) next.focus();
+        else document.activeElement?.blur?.();
+      };
       const makeRouteGeocoder = (placeholder, container, onPick) => {
         const g = new MapboxGeocoder({
           accessToken: mapboxgl.accessToken,
@@ -609,7 +619,11 @@ function App() {
           placeholder,
         });
         g.addTo(container);
-        g.on('result', (e) => { onPick(e.result.center, e.result.text || e.result.place_name); setEstimate(null); });
+        g.on('result', (e) => {
+          onPick(e.result.center, e.result.text || e.result.place_name);
+          setEstimate(null);
+          advanceFocus(container);
+        });
         g.on('clear', () => { onPick(null, ""); setEstimate(null); });
         return g;
       };
@@ -630,9 +644,13 @@ function App() {
       // when interacting/searching with the geocoder, make the map move to the point
       geocoderRef.current.on('result' , (e) => {
 
+        const narrow = isNarrowScreen();
+        if (narrow) document.activeElement?.blur?.(); // drop the keyboard so the result is visible
         mapRef.current.flyTo({
           center: e.result.center,
-          zoom: 14
+          zoom: 14,
+          // on a phone the search card covers the top of the map; center the pin in what's left
+          offset: narrow ? [0, (sheetRef.current?.offsetHeight || 0) / 2] : [0, 0],
       });
       if (mapRef.current.getSource('closest-point-route')) {
         mapRef.current.removeLayer('line-dashed');
@@ -758,6 +776,13 @@ function App() {
         </div>
 
         <div className='geocoder-container' ref={geocoderContainerRef} hidden={mode !== "search"}></div>
+
+        {/* mobile only: city shortcuts live in the card instead of floating over the map */}
+        <div className="city-chips" hidden={mode !== "search"}>
+          <button type="button" className="city-chip" onClick={() => viewLocation("LA")}>Los Angeles</button>
+          <button type="button" className="city-chip" onClick={() => viewLocation("SF")}>SF Bay</button>
+          <button type="button" className="city-chip" onClick={() => viewLocation("Phoenix")}>Phoenix</button>
+        </div>
 
         <div className="route-panel" hidden={mode !== "route"}>
           <div className='geocoder-container route-geocoder' ref={pickupContainerRef}></div>

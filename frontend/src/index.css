@@ -21,8 +21,10 @@ a {
 a:hover {
   color: #535bf2;
 }
-html, body { 
-  height: 100%; 
+html, body {
+  height: 100%;
+  /* no pull-to-refresh / rubber-band bounce while dragging the map or the sheet */
+  overscroll-behavior: none;
 }
 body {
   margin: 0;
@@ -36,8 +38,10 @@ h1 {
   line-height: 1.1;
 }
 
-button:hover {
-  border-color: #646cff;
+@media (hover: hover) {
+  button:hover {
+    border-color: #646cff;
+  }
 }
 button:focus,
 button:focus-visible {

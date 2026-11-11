@@ -290,7 +290,10 @@
   font-size: 22px;
   line-height: 1;
 }
-.dtp-nav:hover { background-color: #eeeeee; }
+.dtp-nav:active { background-color: #eeeeee; }
+@media (hover: hover) {
+  .dtp-nav:hover { background-color: #eeeeee; }
+}
 .dtp-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
 .dtp-weekday { font-size: 12px; font-weight: bold; color: #999999; padding: 4px 0; }
 .dtp-day {
@@ -302,7 +305,10 @@
   font-size: 14px;
   padding: 0;
 }
-.dtp-day:hover:not(:disabled):not(.selected) { background-color: #fff3e6; }
+.dtp-day:active:not(:disabled):not(.selected) { background-color: #fff3e6; }
+@media (hover: hover) {
+  .dtp-day:hover:not(:disabled):not(.selected) { background-color: #fff3e6; }
+}
 .dtp-day.today { border-color: #FF8000; }
 .dtp-day.selected { background-color: #FF8000; color: #ffffff; font-weight: bold; }
 .dtp-day:disabled { color: #c8c8c8; cursor: default; }
@@ -474,8 +480,8 @@
   width: 100px;
   padding: 5px;
 }
-.button:hover {
-  border-color: #FF8000;
+@media (hover: hover) {
+  .button:hover { border-color: #FF8000; }
 }
 .button:active {
   background-color: #ececec;
@@ -496,9 +502,10 @@
   display: none !important;
 }
 
-/* mobile sheet controls: hidden on desktop */
+/* mobile sheet controls + in-card city chips: hidden on desktop */
 .sheet-grabber,
-.sheet-summary { display: none; }
+.sheet-summary,
+.city-chips { display: none; }
 
 /* RESPONSIVE BREAKPOINTS - for different size devices */
 
@@ -511,12 +518,18 @@
     
   }
 
-  /* search box: full-width strip at the top */
+  /* no grey flash on tap; :active styles give the feedback instead */
+  .search-card button,
+  .button { -webkit-tap-highlight-color: transparent; }
+
+  /* search box: full-width strip at the top, clear of the notch */
   .search-card {
-    top: 12px;
-    left: 12px;
-    right: 12px;
+    top: calc(12px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+    right: calc(12px + env(safe-area-inset-right));
     width: auto;
+    max-width: 480px;
+    margin: 0 auto;
     /* tall content (e.g. the open calendar) scrolls instead of running off screen */
     max-height: calc(100dvh - 120px);
     overflow-y: auto;
@@ -527,7 +540,70 @@
 
   /* collapsed: only the essentials stay (search box, or a one-line trip summary) */
   .search-card.collapsed .mode-toggle,
+  .search-card.collapsed .city-chips,
   .search-card.collapsed .route-panel { display: none !important; }
+
+  /* 44px touch targets (Apple HIG / Material minimum) */
+  .mode-tab { min-height: 40px; font-size: 15px; }
+  .dtp-chip { min-height: 44px; }
+  .dtp-now { min-height: 44px; padding: 0 14px; }
+  .dtp-nav { width: 44px; height: 44px; }
+  .dtp-segmented button { min-height: 36px; padding: 6px 14px; font-size: 14px; }
+  .dtp-done { min-height: 44px; padding: 0 16px; font-size: 15px; }
+  .dtp-digit { min-height: 48px; }
+  .button.estimate-button { height: 48px; font-size: 16px; }
+
+  /* the card scrolls, so an absolutely-positioned suggestion list gets clipped inside it;
+     put the list in normal flow so it pushes content down and scrolls with the card */
+  .search-card .mapboxgl-ctrl-geocoder .suggestions {
+    position: static;
+    margin-top: 4px;
+    box-shadow: none;
+    border: 1px solid #ececec;
+  }
+  .search-card .mapboxgl-ctrl-geocoder .suggestions > li > a {
+    padding: 12px 14px;           /* roomy enough to tap the right row */
+  }
+  .search-card .mapboxgl-ctrl-geocoder--button {
+    min-width: 44px;              /* clear (x) button */
+  }
+
+  /* city shortcuts: a chip row inside the card */
+  .city-chips {
+    display: flex;
+    gap: 8px;
+  }
+  .city-chip {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    background-color: #ffffff;
+    color: #000000;
+    font: inherit;
+    font-size: 14px;
+    font-weight: bold;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .city-chip:active { background-color: #fff3e6; border-color: #FF8000; }
+
+  /* floating title + city cards would collide with the locate button and the Mapbox
+     attribution along the bottom edge; the card's chips replace them */
+  .title-card,
+  .locations-card { display: none; }
+
+  /* keep the map's own controls above the home indicator */
+  .mapboxgl-ctrl-bottom-left,
+  .mapboxgl-ctrl-bottom-right { margin-bottom: env(safe-area-inset-bottom); }
+  .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-geolocate {
+    width: 44px;
+    height: 44px;
+  }
 
   .sheet-grabber {
     -webkit-appearance: none;
@@ -586,53 +662,15 @@
     color: #c96200;
   }
 
-  /* title: just below the search box */
-  .title-card {
-    top: auto;
-    bottom: 16px;
-    left: 12px;
-    right: auto;
-    overflow-y: auto;
-  }
-
-  /* city buttons: centered along the bottom */
-  .locations-card {
-    top: auto;
-    bottom: 16px;
-    left: auto;
-    right: 16px;
-    width: auto;
-    flex-direction: column;
-    padding: 8px;
-
-  }
-
-  .text-block { font-size: clamp(20px, 5vw, 30px); }
-  .small-text-block { font-size: clamp(20px, 5vw, 15px); }
 }
 
 /* Phones */
 
 @media (max-width: 480px) {
-  .title-card { display: none; }          /* decorative — reclaim space */
-
-  .locations-card { 
-    bottom: 12px; 
-    
-    
-  }
-  .search-card { top: 8px; left: 8px; right: 8px; }
-
-  /* city buttons: one compact row instead of a tall column over the map */
-  .locations-card {
-    flex-direction: row;
-    padding: 6px;
-    gap: 6px;
-    border-radius: 28px;
-  }
-  .locations-card .button {
-    width: 56px;
-    min-height: 44px;                     /* iOS touch-target minimum */
+  .search-card {
+    top: calc(8px + env(safe-area-inset-top));
+    left: calc(8px + env(safe-area-inset-left));
+    right: calc(8px + env(safe-area-inset-right));
   }
 }
 
