@@ -29,6 +29,8 @@ reports, and the page pings `/health` on load to start waking it.
 - `npm run build` — production build to `dist/`
 - `npm run preview` — serve the built `dist/`
 - `npm run lint` — ESLint (flat config in `eslint.config.js`)
+- `python3 scripts/gen_og.py` — regenerate `public/og-image.png` (link-preview image) with
+  headless Chrome. Its sample fare is hardcoded; re-price it if `pricing.js` rates change.
 
 ### Backend (`cd backend`)
 - `node index.cjs` — start the API on port **3001** (hardcoded in `index.cjs`; no start
