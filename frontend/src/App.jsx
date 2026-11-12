@@ -889,7 +889,8 @@ function App() {
           aria-live="polite"
           onAnimationEnd={(e) => { if (e.animationName === "loading-out") setLoadingGone(true); }}
         >
-          <h1 className="loading-title">Waymo Trip Calculator</h1>
+          {/* not an h1: the panel title below is the page's single h1 */}
+          <div className="loading-title">Waymo Trip Calculator</div>
           <div className="loading-bar"><span /></div>
           <div className="loading-text">
             {slowLoad

@@ -5,11 +5,54 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#e9ecf1" />
-    <meta name="description" content="Interactive map of Waymo robotaxi service areas. Check whether an address is covered and estimate a trip fare." />
+    <title>Waymo Fare Estimator &amp; Service Area Map | Waymo Fares</title>
+    <meta name="description" content="Free Waymo fare estimator: price a robotaxi trip and check if an address is in a Waymo service area in SF, LA, Phoenix, San Diego and Dallas." />
+    <link rel="canonical" href="https://www.waymofares.org/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Waymo Fares" />
+    <meta property="og:url" content="https://www.waymofares.org/" />
+    <meta property="og:title" content="Waymo Fare Estimator &amp; Service Area Map" />
+    <meta property="og:description" content="Price a Waymo robotaxi trip and check if an address is inside a Waymo service area in SF, LA, Phoenix, San Diego and Dallas." />
+    <meta property="og:image" content="https://www.waymofares.org/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Map of Waymo service areas with a fare estimate" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Waymo Fare Estimator &amp; Service Area Map" />
+    <meta name="twitter:description" content="Price a Waymo robotaxi trip and check if an address is inside a Waymo service area in SF, LA, Phoenix, San Diego and Dallas." />
+    <meta name="twitter:image" content="https://www.waymofares.org/og-image.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Waymo Fares",
+        "alternateName": "Waymo Trip Calculator",
+        "url": "https://www.waymofares.org/",
+        "description": "Unofficial Waymo fare estimator and service area map. Estimate the price of a Waymo robotaxi trip and check whether an address is inside a Waymo service area.",
+        "applicationCategory": "TravelApplication",
+        "operatingSystem": "Any (web browser)",
+        "browserRequirements": "Requires JavaScript",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "areaServed": [
+          { "@type": "City", "name": "San Francisco Bay Area, CA" },
+          { "@type": "City", "name": "Los Angeles, CA" },
+          { "@type": "City", "name": "San Diego, CA" },
+          { "@type": "City", "name": "Phoenix, AZ" },
+          { "@type": "City", "name": "Dallas, TX" }
+        ]
+      }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <title>Waymo Trip Calculator</title>
     <script>
       // set the theme before first paint (same rules as src/theme.js)
       (function () {
@@ -21,7 +64,18 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Static content for crawlers and the moment before JS runs. React replaces it on
+         mount, and it is styled to match the loading screen so there's no visible jump. -->
+    <div id="root">
+      <main style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:0 24px;text-align:center;background-color:var(--app-bg,#e9ecf1);font-family:Figtree,-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif">
+        <h1 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-0.02em;line-height:1.15;color:var(--text,#0e1621)">Waymo Trip Calculator</h1>
+        <p style="margin:0;max-width:420px;font-size:16px;color:var(--text-secondary,#5b6472)">
+          Estimate Waymo robotaxi fares and check whether an address is inside a Waymo
+          service area in San Francisco, Los Angeles, San Diego, Phoenix and Dallas.
+        </p>
+        <noscript><p style="margin:0;color:var(--text-secondary,#5b6472)">The map needs JavaScript to run.</p></noscript>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
