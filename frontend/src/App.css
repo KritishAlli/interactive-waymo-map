@@ -115,8 +115,6 @@
 
 /* ---------- panel (left sidebar on desktop, bottom sheet on mobile) ---------- */
 .panel {
-  /* keep native controls (buttons, geocoder input) in light mode */
-  color-scheme: light;
   position: absolute;
   top: var(--space-4);
   left: var(--space-4);
@@ -465,7 +463,7 @@
   .dtp-day:hover:not(:disabled):not(.selected) { background-color: var(--gray-100); }
 }
 .dtp-day.today { border-color: var(--accent); }
-.dtp-day.selected { background-color: var(--accent); color: var(--gray-0); font-weight: var(--weight-semibold); }
+.dtp-day.selected { background-color: var(--accent); color: var(--on-accent); font-weight: var(--weight-semibold); }
 .dtp-day:disabled { color: var(--gray-300); cursor: default; }
 
 /* clock */
@@ -542,7 +540,7 @@
   fill: var(--text);
   pointer-events: none;
 }
-.dtp-num.active { fill: var(--gray-0); font-weight: var(--weight-semibold); }
+.dtp-num.active { fill: var(--on-accent); font-weight: var(--weight-semibold); }
 @media (prefers-reduced-motion: reduce) { .dtp-nums { animation: none; } }
 .dtp-done {
   align-self: flex-end;
@@ -559,7 +557,6 @@
 .button {
   -webkit-appearance: none;
   appearance: none;
-  color-scheme: light;
   border: 0;
   font: inherit;
   cursor: pointer;
@@ -571,7 +568,7 @@
   margin-top: var(--space-2);
   border-radius: var(--radius-full);
   background-color: var(--accent);
-  color: var(--gray-0);
+  color: var(--on-accent);
   font-size: 17px;
   font-weight: var(--weight-semibold);
 }
@@ -591,7 +588,7 @@
   position: relative;
   overflow: hidden;
   background-color: var(--accent);
-  color: var(--gray-0);
+  color: var(--on-accent);
   cursor: progress;
 }
 .button.estimate-button.busy::after {
@@ -767,7 +764,7 @@
   padding: 0 var(--space-5);
   border-radius: var(--radius-full);
   background-color: var(--accent);
-  color: var(--gray-0);
+  color: var(--on-accent);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
@@ -1042,7 +1039,6 @@
 
 /* message from the locate button (e.g. how to unblock location), above the map controls */
 .location-toast {
-  color-scheme: light;
   position: fixed;
   left: calc(12px + env(safe-area-inset-left));
   right: calc(12px + env(safe-area-inset-right));
@@ -1284,3 +1280,47 @@
   }
   .pulse-ring, .button.estimate-button.busy::after { display: none; }
 }
+
+/* ---------- theme toggle + Mapbox widgets in the dark theme ---------- */
+.theme-toggle {
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  position: absolute;
+  top: calc(var(--space-4) + env(safe-area-inset-top));
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background-color: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), transform 0.12s var(--ease);
+}
+@media (hover: hover) {
+  .theme-toggle:hover { background-color: var(--surface-sunken); }
+}
+.theme-toggle:active { transform: scale(0.94); }
+@media (max-width: 768px) {
+  .theme-toggle {
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+  }
+}
+
+/* mapbox-gl and the geocoder ship white widgets; give them the theme's surfaces */
+.mapboxgl-ctrl-group:not(:empty) { background-color: var(--surface); }
+.mapboxgl-ctrl-geocoder .suggestions { background-color: var(--surface); }
+.mapboxgl-ctrl-geocoder .suggestions > li > a { color: var(--text); }
+.mapboxgl-ctrl-geocoder--button { background: transparent; }
+/* control icons are dark SVG backgrounds: flip them, keeping hues (the blue locate state) */
+[data-theme="dark"] .mapboxgl-ctrl-group .mapboxgl-ctrl-icon { filter: invert(1) hue-rotate(180deg); }
+[data-theme="dark"] .mapboxgl-ctrl-attrib.mapboxgl-compact { background-color: var(--surface); color: var(--text-secondary); }
+[data-theme="dark"] .mapboxgl-ctrl-attrib-button { filter: invert(1); }

@@ -9,6 +9,7 @@ import DateTimePicker from './DateTimePicker.jsx'
 import { prepareAreas, snapTrip, checkRoute, areaSqMiles, isInAnyArea, nearestAreaEdge } from './geo.js'
 import { estimateFare } from './pricing.js'
 import { warmBackend } from './backend.js'
+import { useTheme, isDark } from './theme.js'
 // exported from MongoDB by backend/scripts/export-service-areas.cjs; bundled so the map
 // never waits on the backend
 import serviceAreasData from './data/service-areas.json'
@@ -34,22 +35,57 @@ const STATE_NAMES = { AZ: 'Arizona', CA: 'California', TX: 'Texas' };
 const AREA_STYLE = {
   maskColor: '#0e1621', maskOpacity: 0.16,
   fillOpacity: 0, fillOpacityHover: 0.08,
-  lineColor: '#ffffff', lineColorHover: '#00c2a8',
   lineWidth: 3, lineWidthHover: 3.5,
 };
 
 const CURRENT_LOCATION_LABEL = "Current location";
 
-// Mapbox paints in JS, so it can't read CSS variables; keep these in sync with index.css
-const COLORS = {
-  accent: '#007d6e',       // --accent
-  accentBright: '#00c2a8', // --accent-bright
-  ink: '#0e1621',          // --text
-  muted: '#5b6472',        // --text-secondary
-  route: '#007d6e',        // --accent
-  pickup: '#0e1621',       // --text
-  dropoff: '#007d6e',      // --accent
+// Mapbox paints in JS, so it can't read CSS variables; keep these in sync with index.css.
+// Read through mapColors() so new layers and pins pick up the current theme.
+const MAP_COLORS = {
+  light: {
+    accent: '#007d6e',       // --accent
+    accentBright: '#00c2a8', // --accent-bright
+    ink: '#0e1621',          // --text
+    muted: '#5b6472',        // --text-secondary
+    route: '#007d6e',        // --accent
+    routeCasing: '#ffffff',
+    pickup: '#0e1621',       // --text
+    dropoff: '#007d6e',      // --accent
+    areaLine: '#ffffff',     // service-area outlines
+    areaLineHover: '#00c2a8',
+  },
+  // night basemap: teal instead of white for outlines, casing and the search pin
+  dark: {
+    accent: '#007d6e',
+    accentBright: '#00c2a8',
+    ink: '#00a08c',
+    muted: '#4f9a90',
+    route: '#00c2a8',
+    routeCasing: '#0a2e2a',  // dark teal halo instead of white
+    pickup: '#0e1621',       // same pins as light: dark pickup, teal dropoff
+    dropoff: '#007d6e',
+    areaLine: '#00a08c',
+    areaLineHover: '#5eead4',
+  },
 };
+const mapColors = () => MAP_COLORS[isDark() ? 'dark' : 'light'];
+const lightPreset = () => (isDark() ? 'night' : 'day');
+
+function ThemeIcon({ dark }) {
+  return dark ? (
+    // sun: switch to light
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  ) : (
+    // moon: switch to dark
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+    </svg>
+  );
+}
 
 function LocationArrowIcon() {
   return (
@@ -80,6 +116,7 @@ const PIN_LANDS_MS = PIN_DROP_DELAY_MS + 330;
 
 function App() {
 
+  const [theme, toggleTheme] = useTheme();
   const [mapReady, setMapReady] = useState(false); // map style loaded and service areas drawn
   const [slowLoad, setSlowLoad] = useState(false); // map is taking unusually long to load
   const [locationMessage, setLocationMessage] = useState(null); // locate-button errors
@@ -218,7 +255,7 @@ function App() {
     if (on && routeDrawnRef.current) return; // no teal hover wash while a route is on the map
     map.setPaintProperty('fill-' + city, 'fill-opacity', on ? AREA_STYLE.fillOpacityHover : AREA_STYLE.fillOpacity);
     map.setPaintProperty('outline-' + city, 'line-width', on ? AREA_STYLE.lineWidthHover : AREA_STYLE.lineWidth);
-    map.setPaintProperty('outline-' + city, 'line-color', on ? AREA_STYLE.lineColorHover : AREA_STYLE.lineColor);
+    map.setPaintProperty('outline-' + city, 'line-color', on ? mapColors().areaLineHover : mapColors().areaLine);
   }
 
   function stopDashAnimation() {
@@ -351,21 +388,21 @@ function App() {
       lineMetrics: true, // needed for line-trim-offset (the draw-on animation)
       data: { type: 'Feature', properties: {}, geometry: route.geometry },
     });
-    // white casing under the line keeps it readable over the shaded service areas;
+    // casing under the line keeps it readable over the shaded service areas;
     // both start fully trimmed and are drawn on from pickup to dropoff
     map.addLayer({
       id: 'route-casing',
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-emissive-strength': 1, 'line-trim-offset': [0, 1] },
+      paint: { 'line-color': mapColors().routeCasing, 'line-width': 9, 'line-emissive-strength': 1, 'line-trim-offset': [0, 1] },
     });
     map.addLayer({
       id: 'route-line',
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': COLORS.route, 'line-width': 5, 'line-emissive-strength': 1, 'line-trim-offset': [0, 1] },
+      paint: { 'line-color': mapColors().route, 'line-width': 5, 'line-emissive-strength': 1, 'line-trim-offset': [0, 1] },
     });
     const DRAW_MS = 1400;
     const coords = route.geometry.coordinates;
@@ -395,13 +432,13 @@ function App() {
       type: 'line',
       source: 'route-gaps',
       layout: { 'line-cap': 'round' },
-      paint: { 'line-color': COLORS.muted, 'line-width': 4, 'line-dasharray': [0.5, 2], 'line-emissive-strength': 1 },
+      paint: { 'line-color': mapColors().muted, 'line-width': 4, 'line-dasharray': [0.5, 2], 'line-emissive-strength': 1 },
     });
 
     // pickup pin drops first, dropoff lands as the line arrives
     const markers = [
-      dropIn(new mapboxgl.Marker({ color: COLORS.pickup }).setLngLat(ends.pickup.original), 0).addTo(map),
-      dropIn(new mapboxgl.Marker({ color: COLORS.dropoff }).setLngLat(ends.dropoff.original), 250 + DRAW_MS - 150).addTo(map),
+      dropIn(new mapboxgl.Marker({ color: mapColors().pickup }).setLngLat(ends.pickup.original), 0).addTo(map),
+      dropIn(new mapboxgl.Marker({ color: mapColors().dropoff }).setLngLat(ends.dropoff.original), 250 + DRAW_MS - 150).addTo(map),
     ];
     for (const e of gaps) {
       const mid = [(e.original[0] + e.point[0]) / 2, (e.original[1] + e.point[1]) / 2];
@@ -458,7 +495,7 @@ function App() {
     if (currentMarkerRef.current) {
       currentMarkerRef.current.remove();
     }
-    var marker = dropIn(new mapboxgl.Marker({ color: COLORS.ink }).
+    var marker = dropIn(new mapboxgl.Marker({ color: mapColors().ink }).
         setLngLat(e.result.center), PIN_DROP_DELAY_MS) // land after the camera starts flying
         marker._element.id = "selection";
         marker.addTo(mapRef.current);
@@ -504,7 +541,7 @@ function App() {
       source: 'closest-point-route',
       id: 'line-dashed',
       paint: {
-        'line-color': COLORS.muted,
+        'line-color': mapColors().muted,
         'line-width': 5,
         'line-dasharray': [0, 4, 3],
         'line-emissive-strength': 1
@@ -604,6 +641,23 @@ function App() {
     return () => clearTimeout(slowTimer);
   }, []);
 
+  // restyle the map for the theme: night basemap, and recolor lines already drawn
+  // (pins keep the color they were dropped with)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    map.setConfigProperty('basemap', 'lightPreset', lightPreset());
+    const c = mapColors();
+    const recolor = {
+      'route-line': c.route, 'route-casing': c.routeCasing,
+      'route-gaps-line': c.muted, 'line-dashed': c.muted,
+      ...Object.fromEntries(SERVICE_AREAS.map((a) => ['outline-' + a.city, c.areaLine])),
+    };
+    for (const [id, color] of Object.entries(recolor)) {
+      if (map.getLayer(id)) map.setPaintProperty(id, 'line-color', color);
+    }
+  }, [theme, mapReady]);
+
   useEffect(() => {
     document.title = "Waymo Trip Calculator";
     mapboxgl.accessToken = API_KEY;
@@ -613,7 +667,8 @@ function App() {
       container: mapContainerRef.current,
       center:  [-118.439789907, 34.06999972],
       zoom: 13,
-      style: "mapbox://styles/krialli/cmjuygaby006001s76rracetd"
+      style: "mapbox://styles/krialli/cmjuygaby006001s76rracetd",
+      config: { basemap: { lightPreset: lightPreset() } },
     });
 
 
@@ -656,7 +711,7 @@ function App() {
           type: 'fill',
           source: area.city,
           paint: {
-            'fill-color': COLORS.accentBright,
+            'fill-color': mapColors().accentBright,
             'fill-opacity': AREA_STYLE.fillOpacity,
             'fill-opacity-transition': { duration: 150 },
           },
@@ -667,7 +722,7 @@ function App() {
           source: area.city,
           layout: { 'line-join': 'round' },
           paint: {
-            'line-color': AREA_STYLE.lineColor,
+            'line-color': mapColors().areaLine,
             'line-width': AREA_STYLE.lineWidth,
             'line-width-transition': { duration: 150 },
             'line-color-transition': { duration: 150 },
@@ -688,10 +743,10 @@ function App() {
           ['fill-' + area.city, 'fill-opacity', 0.25, AREA_STYLE.fillOpacity],
         ], 1100, { delay });
         // flash the hover color, then hand back to the normal style
-        map.setPaintProperty('outline-' + area.city, 'line-color', AREA_STYLE.lineColorHover);
+        map.setPaintProperty('outline-' + area.city, 'line-color', mapColors().areaLineHover);
         setTimeout(() => {
           if (map.getLayer('outline-' + area.city)) {
-            map.setPaintProperty('outline-' + area.city, 'line-color', AREA_STYLE.lineColor);
+            map.setPaintProperty('outline-' + area.city, 'line-color', mapColors().areaLine);
           }
         }, delay + 700);
       });
@@ -854,6 +909,16 @@ function App() {
       )}
 
       <div className="map-container" ref={mapContainerRef} />
+
+      <button
+        type="button"
+        className="theme-toggle"
+        onClick={toggleTheme}
+        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        title={theme === "dark" ? "Light mode" : "Dark mode"}
+      >
+        <ThemeIcon dark={theme === "dark"} />
+      </button>
 
       <aside
         ref={sheetRef}

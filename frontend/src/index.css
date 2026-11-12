@@ -7,6 +7,7 @@
   --accent-bright: #00c2a8;        /* decorative only (map highlights); never behind text */
   --accent-soft: #e0f4f0;
   --accent-text: #006e62;          /* teal as text on white or the app gray */
+  --on-accent: #ffffff;            /* text and marks on a filled --accent */
 
   /* neutrals: cool, slightly blue grays */
   --gray-0: #ffffff;
@@ -81,6 +82,37 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark theme: data-theme is set before first paint (index.html) and by src/theme.js.
+   The gray scale flips (gray-0 is the darkest surface, gray-900 the lightest text), so
+   rules written against the grays work in both themes. */
+:root[data-theme="dark"] {
+  --accent-hover: #008a7a;
+  --accent-pressed: #009886;
+  --accent-soft: #0f3a35;
+  --accent-text: #3fd1bb;
+
+  --gray-0: #18202b;
+  --gray-50: #1f2834;
+  --gray-100: #10161f;             /* app background */
+  --gray-200: #2b3542;
+  --gray-300: #3b4655;
+  --gray-400: #7c8695;
+  --gray-500: #a6afbc;
+  --gray-700: #d0d6de;
+  --gray-900: #eef1f5;
+
+  --danger-text: #ff8b80;
+  --danger-soft: #3b1815;
+  --warning-text: #f3c56e;
+  --warning-soft: #362a10;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.30);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.25), 0 12px 32px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 4px 12px rgb(0 0 0 / 0.30), 0 20px 48px rgb(0 0 0 / 0.45);
+
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
