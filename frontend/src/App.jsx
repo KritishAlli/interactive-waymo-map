@@ -1046,10 +1046,12 @@ function App() {
               </ol>
 
               <dl className="receipt-breakdown">
-                <div><dt>Base fare</dt><dd>${estimate.breakdown.base.toFixed(2)}</dd></div>
                 <div><dt>Distance</dt><dd>${estimate.breakdown.distance.toFixed(2)}</dd></div>
                 <div><dt>Time</dt><dd>${estimate.breakdown.time.toFixed(2)}</dd></div>
                 <div><dt>Booking fee</dt><dd>${estimate.breakdown.bookingFee.toFixed(2)}</dd></div>
+                {estimate.breakdown.minimumFareTopUp > 0 && (
+                  <div><dt>Minimum fare</dt><dd>${estimate.breakdown.minimumFareTopUp.toFixed(2)}</dd></div>
+                )}
               </dl>
 
               <p className="route-disclaimer">Unofficial estimate, not Waymo pricing.</p>

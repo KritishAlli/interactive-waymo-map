@@ -5,26 +5,32 @@
 // Waymo does not publish its pricing formula. Per-city rates are least-squares fits
 // (coefficients constrained >= 0) to the crowdsourced rides behind the Waymo Price Tracker
 // (https://waymo-pricing.streamlit.app, data: github.com/EwoutH/Waymo-pricing), using the
-// tracker's outlier filters: 113 rides, mostly 2024, as of Nov 2026. Each fit's intercept
-// is split into `base` + the shared booking fee. Tune rates here.
+// tracker's outlier filters: 113 rides, mostly 2024, as of Nov 2026. Tune rates here.
 //
-// Prices differ a lot by city: Phoenix rides average ~$17 against ~$25 in SF and LA, and
-// Phoenix barely charges for distance (fast, freeway-heavy trips), so one formula for all
-// cities was off by several dollars. Re-fit when more rides are reported.
+// There is no base fare: a trip is (distance + time) x the time-of-day multiplier + the
+// booking fee, at least the minimum fare. Rates are fitted to that exact model, with each
+// ride's multiplier applied. Night rides (16) are left out of the fit, since night pricing
+// is a product choice rather than fitted (see getTimeMultiplier).
+//
+// Prices differ a lot by city: Phoenix rides average ~$17 against ~$25 in SF and LA, so
+// one formula for all cities was off by several dollars. Phoenix fares barely grow with
+// distance, which a model with no base fare can't capture well (R² ~0): expect short
+// Phoenix trips to be underestimated and long ones overestimated. Re-fit when more rides
+// are reported.
 export const CITY_RATES = {
-  //                    base ($)  $/mile  $/minute   fit: n, R²
-  "San Francisco Bay": { base: 8.92, perMile: 1.48, perMinute: 0.31 }, // n=51, R² 0.74
-  "Los Angeles":       { base: 5.64, perMile: 1.58, perMinute: 0.30 }, // n=24, R² 0.78
-  "Phoenix":           { base: 8.08, perMile: 0.21, perMinute: 0.27 }, // n=38, R² 0.42
+  //                    $/mile  $/minute        fit: n, R²
+  "San Francisco Bay": { perMile: 1.52, perMinute: 0.56 }, // n=40, R² 0.50
+  "Los Angeles":       { perMile: 2.17, perMinute: 0.28 }, // n=23, R² 0.74
+  "Phoenix":           { perMile: 1.28, perMinute: 0.30 }, // n=34, R² -0.02
 };
 
 // Cities with no ride data yet (Dallas, San Diego, new areas): the average of the three
 // fitted cities. A guess until rides from those cities are reported.
-export const DEFAULT_RATES = { base: 7.55, perMile: 1.09, perMinute: 0.29 };
+export const DEFAULT_RATES = { perMile: 1.66, perMinute: 0.38 };
 
 export const FEES = {
   bookingFee: 2.50,    // flat fee added after the time-of-day multiplier ($)
-  minimumFare: 7.50,   // no trip costs less than this ($); lowest fare in the data was $7.51
+  minimumFare: 6.50,   // no trip costs less than this ($)
   rangeSpread: 0.15,   // low/high = estimate -/+ 15%; the middle half of tracker rides
                        // landed within about -16%/+12% of their city's fit
 };
@@ -76,22 +82,25 @@ export function estimateFare(distanceMiles, durationMinutes, departAt, city) {
   const rates = ratesForCity(city);
   const { multiplier, label } = getTimeMultiplier(departAt);
 
-  const distanceCost = rates.perMile * distanceMiles;
-  const timeCost = rates.perMinute * durationMinutes;
-  const subtotal = (rates.base + distanceCost + timeCost) * multiplier;
-  const estimate = Math.max(FEES.minimumFare, subtotal + FEES.bookingFee);
+  // The time-of-day multiplier scales distance and time; the booking fee is flat. The
+  // breakdown shows the scaled amounts, plus a minimum-fare top-up when one applies, so
+  // its lines always add up to the estimate.
+  const distanceCost = round2(rates.perMile * distanceMiles * multiplier);
+  const timeCost = round2(rates.perMinute * durationMinutes * multiplier);
+  const fare = round2(distanceCost + timeCost + FEES.bookingFee);
+  const estimate = Math.max(FEES.minimumFare, fare);
 
   return {
-    estimate: round2(estimate),
+    estimate,
     low: round2(Math.max(FEES.minimumFare, estimate * (1 - FEES.rangeSpread))),
     high: round2(estimate * (1 + FEES.rangeSpread)),
     multiplier,
     timeLabel: label,
     breakdown: {
-      base: rates.base,
-      distance: round2(distanceCost),
-      time: round2(timeCost),
+      distance: distanceCost,
+      time: timeCost,
       bookingFee: FEES.bookingFee,
+      minimumFareTopUp: round2(estimate - fare), // 0 unless the minimum fare applies
     },
   };
 }
