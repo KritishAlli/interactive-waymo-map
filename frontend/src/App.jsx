@@ -8,6 +8,8 @@ import './App.css'
 import DateTimePicker from './DateTimePicker.jsx'
 import { prepareAreas, snapTrip, checkRoute, areaSqMiles } from './geo.js'
 import LocateControl, { getPosition, locationErrorMessage } from './locate.js'
+import { tweenPaint, drawLine, startRouteCar, pulseMarker, dropIn } from './animations.js'
+import AnimatedNumber from './AnimatedNumber.jsx'
 import { XMarkIcon } from '@heroicons/react/20/solid'
 import { MapPinIcon } from '@heroicons/react/24/outline'
 
@@ -93,6 +95,9 @@ function App() {
   const currentMarkerRef = useRef();
   const currentDistancePopupRef = useRef();
   const dashAnimationRef = useRef();
+  const currentPulseRef = useRef();
+  const routeAnimCancelsRef = useRef([]); // cancel fns for the route draw + car loop
+  const [loadingGone, setLoadingGone] = useState(false); // loading screen finished fading out
 
   // route price estimation mode
   const [mode, setMode] = useState("route"); // "search" | "route"
@@ -240,12 +245,16 @@ function App() {
     currentMarkerRef.current = null;
     currentDistancePopupRef.current?.remove();
     currentDistancePopupRef.current = null;
+    currentPulseRef.current?.remove();
+    currentPulseRef.current = null;
     const map = mapRef.current;
     if (map?.getLayer('line-dashed')) map.removeLayer('line-dashed');
     if (map?.getSource('closest-point-route')) map.removeSource('closest-point-route');
   }
 
   function clearRoute() {
+    routeAnimCancelsRef.current.forEach((cancel) => cancel());
+    routeAnimCancelsRef.current = [];
     routeMarkersRef.current.forEach((m) => m.remove());
     routeMarkersRef.current = [];
     const map = mapRef.current;
@@ -338,16 +347,19 @@ function App() {
     return { route: best.route, staysInside: false };
   }
 
-  function distancePill(miles) {
+  // `delay` (ms) staggers the CSS pop-in so map labels appear as the line reaches them
+  function distancePill(miles, delay = 0) {
     const el = document.createElement("div");
     el.className = "distance-pill";
     el.textContent = `${miles.toFixed(2)} mi`;
+    el.style.setProperty('--anim-delay', `${delay}ms`);
     return el;
   }
 
-  function stopDot() {
+  function stopDot(delay = 0) {
     const el = document.createElement("div");
     el.className = "stop-dot";
+    el.style.setProperty('--anim-delay', `${delay}ms`);
     return el;
   }
 
@@ -358,23 +370,33 @@ function App() {
     clearRoute();
     map.addSource('route', {
       type: 'geojson',
+      lineMetrics: true, // needed for line-trim-offset (the draw-on animation)
       data: { type: 'Feature', properties: {}, geometry: route.geometry },
     });
-    // white casing under the line keeps it readable over the shaded service areas
+    // white casing under the line keeps it readable over the shaded service areas;
+    // both start fully trimmed and are drawn on from pickup to dropoff
     map.addLayer({
       id: 'route-casing',
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-emissive-strength': 1 },
+      paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-emissive-strength': 1, 'line-trim-offset': [0, 1] },
     });
     map.addLayer({
       id: 'route-line',
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': COLORS.route, 'line-width': 5, 'line-emissive-strength': 1 },
+      paint: { 'line-color': COLORS.route, 'line-width': 5, 'line-emissive-strength': 1, 'line-trim-offset': [0, 1] },
     });
+    const DRAW_MS = 1400;
+    const coords = route.geometry.coordinates;
+    routeAnimCancelsRef.current.push(
+      drawLine(map, ['route-casing', 'route-line'], DRAW_MS, {
+        delay: 250,
+        onDone: () => routeAnimCancelsRef.current.push(startRouteCar(map, coords)),
+      })
+    );
 
     const gaps = [ends.pickup, ends.dropoff].filter((e) => !e.inArea);
     map.addSource('route-gaps', {
@@ -396,14 +418,16 @@ function App() {
       paint: { 'line-color': COLORS.muted, 'line-width': 4, 'line-dasharray': [0.5, 2], 'line-emissive-strength': 1 },
     });
 
+    // pickup pin drops first, dropoff lands as the line arrives
     const markers = [
-      new mapboxgl.Marker({ color: COLORS.pickup }).setLngLat(ends.pickup.original).addTo(map),
-      new mapboxgl.Marker({ color: COLORS.dropoff }).setLngLat(ends.dropoff.original).addTo(map),
+      dropIn(new mapboxgl.Marker({ color: COLORS.pickup }).setLngLat(ends.pickup.original), 0).addTo(map),
+      dropIn(new mapboxgl.Marker({ color: COLORS.dropoff }).setLngLat(ends.dropoff.original), 250 + DRAW_MS - 150).addTo(map),
     ];
     for (const e of gaps) {
       const mid = [(e.original[0] + e.point[0]) / 2, (e.original[1] + e.point[1]) / 2];
-      markers.push(new mapboxgl.Marker({ element: stopDot() }).setLngLat(e.point).addTo(map));
-      markers.push(new mapboxgl.Marker({ element: distancePill(e.gapMiles), anchor: 'center' }).setLngLat(mid).addTo(map));
+      const delay = e === ends.pickup ? 200 : 250 + DRAW_MS;
+      markers.push(new mapboxgl.Marker({ element: stopDot(delay) }).setLngLat(e.point).addTo(map));
+      markers.push(new mapboxgl.Marker({ element: distancePill(e.gapMiles, delay + 120), anchor: 'center' }).setLngLat(mid).addTo(map));
     }
     routeMarkersRef.current = markers;
 
@@ -463,8 +487,8 @@ function App() {
     if (currentMarkerRef.current) {
       currentMarkerRef.current.remove();
     }
-    var marker = new mapboxgl.Marker({ color: COLORS.ink }).
-        setLngLat(e.result.center)
+    var marker = dropIn(new mapboxgl.Marker({ color: COLORS.ink }).
+        setLngLat(e.result.center), 350) // land after the camera starts flying
         marker._element.id = "selection";
         marker.addTo(mapRef.current);
       currentMarkerRef.current = marker;
@@ -636,7 +660,7 @@ function App() {
         id: 'outside-mask',
         type: 'fill',
         source: 'outside-mask',
-        paint: { 'fill-color': AREA_STYLE.maskColor, 'fill-opacity': AREA_STYLE.maskOpacity },
+        paint: { 'fill-color': AREA_STYLE.maskColor, 'fill-opacity': 0 }, // faded in below
       });
 
       for (const area of data.serviceAreas) {
@@ -668,11 +692,29 @@ function App() {
             'line-width-transition': { duration: 150 },
             'line-color-transition': { duration: 150 },
             'line-emissive-strength': 1,
+            'line-opacity': 0, // faded in below
           },
         });
         map.on('mouseenter', 'fill-' + area.city, () => setAreaHighlight(area.city, true));
         map.on('mouseleave', 'fill-' + area.city, () => setAreaHighlight(area.city, false));
       }
+
+      // reveal: the outside dims, then the outlines glow in with a teal flash that settles to white
+      tweenPaint(map, [['outside-mask', 'fill-opacity', 0, AREA_STYLE.maskOpacity]], 900, { delay: 200 });
+      data.serviceAreas.forEach((area, i) => {
+        const delay = 350 + i * 120;
+        tweenPaint(map, [
+          ['outline-' + area.city, 'line-opacity', 0, 1],
+          ['fill-' + area.city, 'fill-opacity', 0.25, AREA_STYLE.fillOpacity],
+        ], 1100, { delay });
+        // flash the hover color, then hand back to the normal style
+        map.setPaintProperty('outline-' + area.city, 'line-color', AREA_STYLE.lineColorHover);
+        setTimeout(() => {
+          if (map.getLayer('outline-' + area.city)) {
+            map.setPaintProperty('outline-' + area.city, 'line-color', AREA_STYLE.lineColor);
+          }
+        }, delay + 700);
+      });
     }
   );
 
@@ -745,10 +787,17 @@ function App() {
         mapRef.current.removeSource('closest-point-route');
       }
       placeMarker(e);
-        
+      currentPulseRef.current?.remove();
+      currentPulseRef.current = null;
 
         (isInsideBounds(e.result.center[0], e.result.center[1])).then(result => {
-          
+          // ripple under the pin: teal = covered, gray = outside; keep the pin on top
+          const map = mapRef.current;
+          currentPulseRef.current?.remove();
+          currentPulseRef.current = pulseMarker(map, e.result.center, result["point-found"]);
+          const pin = currentMarkerRef.current?.getElement();
+          pin?.parentNode?.appendChild(pin);
+
           if (!result["point-found"]) {
             getClosestPointLine(e.result.center[0], e.result.center[1]);
           }
@@ -769,6 +818,7 @@ function App() {
       pickupGeocoderRef.current?.onRemove();
       dropoffGeocoderRef.current?.onRemove();
       if (dashAnimationRef.current) cancelAnimationFrame(dashAnimationRef.current);
+      routeAnimCancelsRef.current.forEach((cancel) => cancel());
       mapRef.current.remove()
     }
   }, [])
@@ -777,8 +827,13 @@ function App() {
   return (
     <div className="app">
 
-      {!backendReady && (
-        <div className="loading-screen" role="status" aria-live="polite">
+      {!loadingGone && (
+        <div
+          className={`loading-screen${backendReady ? " leaving" : ""}`}
+          role="status"
+          aria-live="polite"
+          onAnimationEnd={(e) => { if (e.animationName === "loading-out") setLoadingGone(true); }}
+        >
           <h1 className="loading-title">Waymo Trip Calculator</h1>
           <div className="loading-bar"><span /></div>
           <div className="loading-text">
@@ -802,7 +857,7 @@ function App() {
 
       <aside
         ref={sheetRef}
-        className={`panel search-card${sheetOpen ? "" : " collapsed"}`}
+        className={`panel search-card${sheetOpen ? "" : " collapsed"}${backendReady ? " entered" : ""}`}
         aria-label="Search and fare estimates"
         onTouchStart={onSheetTouchStart}
         onTouchMove={onSheetTouchMove}
@@ -811,7 +866,12 @@ function App() {
       >
         <header className="panel-header">
           <h1 className="brand-title">Waymo Trip Calculator</h1>
-          <p className="brand-tagline">Check coverage and estimate a fare.</p>
+          {/* keyed on mode so the new line fades in when the tab changes */}
+          <p className="brand-tagline" key={mode}>
+            {mode === "route"
+              ? "Map a route and estimate a fare."
+              : "See if an address is in a Waymo service area."}
+          </p>
         </header>
 
         {mode === "route" && !sheetOpen && (
@@ -827,7 +887,7 @@ function App() {
           </button>
         )}
 
-        <div className="mode-toggle" role="tablist" aria-label="Mode">
+        <div className="mode-toggle" role="tablist" aria-label="Mode" data-mode={mode}>
           <button
             type="button"
             role="tab"
@@ -876,7 +936,7 @@ function App() {
 
           <button
             type="button"
-            className="button estimate-button"
+            className={`button estimate-button${estimating ? " busy" : ""}`}
             disabled={!pickup || !dropoff || estimating}
             onClick={estimateRoute}
           >
@@ -906,7 +966,7 @@ function App() {
               <div className="receipt-head">
                 <div className="receipt-label">Estimated fare</div>
                 <div className="route-price">
-                  ${estimate.low.toFixed(0)}–${estimate.high.toFixed(0)}
+                  $<AnimatedNumber value={estimate.low} />–$<AnimatedNumber value={estimate.high} />
                 </div>
                 <div className="route-meta">
                   {estimate.distanceMiles.toFixed(1)} mi · {Math.round(estimate.durationMinutes)} min
@@ -934,8 +994,8 @@ function App() {
         <section className="city-list" aria-labelledby="city-list-title">
           <h2 className="section-title" id="city-list-title">Service areas</h2>
           <ul>
-            {cityList.map((city) => (
-              <li key={city.name}>
+            {cityList.map((city, i) => (
+              <li key={city.name} style={{ '--i': i }}>
                 <button
                   type="button"
                   className="city-row"
@@ -951,7 +1011,9 @@ function App() {
                     <span className="city-meta">{STATE_NAMES[city.state]}</span>
                   </span>
                   <span className="city-size">
-                    {city.sqmi ? `${Math.round(city.sqmi).toLocaleString()} sq mi` : <span className="skeleton" />}
+                    {city.sqmi
+                      ? <span className="fade-in">{Math.round(city.sqmi).toLocaleString()} sq mi</span>
+                      : <span className="skeleton" />}
                   </span>
                 </button>
               </li>
