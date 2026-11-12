@@ -64,7 +64,7 @@ function App() {
   const dashAnimationRef = useRef();
 
   // route price estimation mode
-  const [mode, setMode] = useState("search"); // "search" | "route"
+  const [mode, setMode] = useState("route"); // "search" | "route"
   const [pickup, setPickup] = useState(null);   // [lng, lat]
   const [dropoff, setDropoff] = useState(null); // [lng, lat]
   const [departAt, setDepartAt] = useState(() => toLocalInputValue(new Date()));
@@ -819,20 +819,20 @@ function App() {
           <button
             type="button"
             role="tab"
-            aria-selected={mode === "search"}
-            className={`mode-tab ${mode === "search" ? "active" : ""}`}
-            onClick={() => switchMode("search")}
-          >
-            Check address
-          </button>
-          <button
-            type="button"
-            role="tab"
             aria-selected={mode === "route"}
             className={`mode-tab ${mode === "route" ? "active" : ""}`}
             onClick={() => switchMode("route")}
           >
             Price a trip
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "search"}
+            className={`mode-tab ${mode === "search" ? "active" : ""}`}
+            onClick={() => switchMode("search")}
+          >
+            Check address
           </button>
         </div>
 
