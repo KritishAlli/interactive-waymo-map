@@ -73,6 +73,32 @@ function milesBetween(a, b, cosLat) {
   return Math.hypot(dx, dy);
 }
 
+// great-circle distance in miles; used where the two points can be far apart
+export function haversineMiles([lng1, lat1], [lng2, lat2]) {
+  const R = 3958.8;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+export function isInAnyArea(coord, areas) {
+  return areas.some((area) => isInArea(coord, area));
+}
+
+// Single-address search: the closest point on any service-area edge, with no distance cap
+// (the address can be in another state). { point: [lng, lat], miles }
+export function nearestAreaEdge(coord, areas) {
+  let best = null;
+  for (const area of areas) {
+    const near = nearestOnBoundary(coord, area);
+    const miles = haversineMiles(coord, near.point);
+    if (!best || miles < best.miles) best = { point: near.point, miles };
+  }
+  return best;
+}
+
 // Where would the Waymo actually stop for this address?
 // { original, point, inArea, gapMiles, areaIndex, tooFar? }
 export function snapEndpoint(coord, areas) {

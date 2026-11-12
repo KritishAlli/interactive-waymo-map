@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import DateTimePicker from './DateTimePicker.jsx'
-
-const API_URL = import.meta.env.VITE_APP_API_URL || "";
+import { API_URL, isBackendAwake, waitForBackend } from './backend.js'
+import { estimateFare } from './pricing.js'
 const FUTURE_SLACK_MS = 5 * 60 * 1000; // a ride can't have happened later than a few minutes from now
 
 // "What did you pay?" form at the bottom of the fare receipt. Sends the real fare plus the
@@ -10,7 +10,8 @@ const FUTURE_SLACK_MS = 5 * 60 * 1000; // a ride can't have happened later than 
 // time changes, so this resets on its own.
 export default function FareReport({ estimate, departAt }) {
   const [paid, setPaid] = useState("");
-  const [status, setStatus] = useState("idle"); // "idle" | "sending" | "sent" | "error" | "limited"
+  // "idle" | "waking" (backend asleep) | "sending" | "sent" | "error" | "limited"
+  const [status, setStatus] = useState("idle");
   const [whenMode, setWhenMode] = useState("trip"); // "trip" = the departure above | "custom"
   const [customAt, setCustomAt] = useState(departAt);
 
@@ -18,7 +19,8 @@ export default function FareReport({ estimate, departAt }) {
   const isFuture = new Date(rideAt).getTime() > Date.now() + FUTURE_SLACK_MS;
   const amount = Number(paid);
   const validAmount = paid.trim() !== "" && Number.isFinite(amount) && amount >= 1 && amount <= 500;
-  const canSubmit = validAmount && !isFuture && status !== "sending";
+  const busy = status === "sending" || status === "waking";
+  const canSubmit = validAmount && !isFuture && !busy;
 
   const clearError = () => { if (status === "error" || status === "limited") setStatus("idle"); };
 
@@ -27,6 +29,15 @@ export default function FareReport({ estimate, departAt }) {
     if (!canSubmit) return;
     setStatus("sending");
     try {
+      // the free-tier backend may be asleep; give it time to wake instead of failing
+      if (!(await isBackendAwake())) {
+        setStatus("waking");
+        if (!(await waitForBackend())) throw new Error("Backend did not wake up");
+        setStatus("sending");
+      }
+      // what the app predicts for this trip at the time they rode (may differ from the
+      // departure above when "Another time" is picked); the backend stores it as-is
+      const fare = estimateFare(estimate.distanceMiles, estimate.durationMinutes, rideAt);
       const res = await fetch(`${API_URL}/api/fare-reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -37,6 +48,13 @@ export default function FareReport({ estimate, departAt }) {
           durationMinutes: estimate.durationMinutes,
           departAt: rideAt,
           paid: amount,
+          fare: {
+            estimate: fare.estimate,
+            low: fare.low,
+            high: fare.high,
+            multiplier: fare.multiplier,
+            timeLabel: fare.timeLabel,
+          },
         }),
       });
       if (res.status === 429) { setStatus("limited"); return; }
@@ -56,7 +74,8 @@ export default function FareReport({ estimate, departAt }) {
   }
 
   let hint = "Anonymous; only used to improve estimates.";
-  if (status === "error") hint = "Couldn't send that. Please try again.";
+  if (status === "waking") hint = "Waking up the server. This can take up to a minute.";
+  else if (status === "error") hint = "Couldn't send that. Please try again.";
   else if (status === "limited") hint = "You've sent a lot of fares recently. Please try again later.";
   else if (isFuture) hint = whenMode === "trip"
     ? "The trip time above is in the future. Pick when you actually rode."
@@ -109,7 +128,7 @@ export default function FareReport({ estimate, departAt }) {
           />
         </div>
         <button type="submit" className="button fare-report-button" disabled={!canSubmit}>
-          {status === "sending" ? "Sending…" : "Submit"}
+          {status === "waking" ? "Connecting…" : status === "sending" ? "Sending…" : "Submit"}
         </button>
       </div>
       <p

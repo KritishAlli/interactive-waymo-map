@@ -5,15 +5,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overview
 
 An interactive map of Waymo robotaxi service areas. A user searches for an address; the
-app drops a marker, asks the backend whether the point is inside any service-area polygon,
-and — if it is not — draws an animated dashed line to the nearest polygon edge with the
-distance in miles.
+app drops a marker, checks whether the point is inside any service-area polygon, and — if
+it is not — draws an animated dashed line to the nearest polygon edge with the distance in
+miles. A route mode plans a pickup → dropoff trip and estimates the fare; users can report
+what they actually paid.
 
 Two independent packages, each with its own `package.json` and `.env` (both `.env` files
 are gitignored and must be created locally):
 
-- `frontend/` — Vite + React 19 single-page app (the whole UI lives in `src/App.jsx`).
-- `backend/` — Express 5 + Mongoose API over a MongoDB collection of service-area polygons.
+- `frontend/` — Vite + React 19 single-page app on Vercel (`vercel.json` proxies `/api` and
+  `/health` to the backend).
+- `backend/` — Express 5 + Mongoose API on Render's free plan (sleeps when idle, 30-60s to
+  wake). MongoDB holds the service-area polygons and user fare reports.
+
+**The page must never wait on the backend.** Service areas are bundled into the frontend,
+and all geometry and pricing run in the browser. The backend is only needed to store fare
+reports, and the page pings `/health` on load to start waking it.
 
 ## Commands
 
@@ -26,6 +33,9 @@ are gitignored and must be created locally):
 ### Backend (`cd backend`)
 - `node index.cjs` — start the API on port **3001** (hardcoded in `index.cjs`; no start
   script, no watch/reload, no test runner)
+- `node scripts/export-service-areas.cjs` — write the active polygons from MongoDB to
+  `frontend/src/data/service-areas.json`. **Run and commit after any service-area change**;
+  the map draws from that file, not the API.
 
 There is no test suite anywhere in the repo.
 
@@ -43,23 +53,28 @@ There is no test suite anywhere in the repo.
 - **Backend module system:** `backend/package.json` declares `"type": "module"`, but every
   backend source file is CommonJS with a `.cjs` extension (`require`/`module.exports`). Keep
   new backend files `.cjs`.
-- **Geospatial logic** lives in `backend/services/logic.cjs` and is a thin wrapper around
-  `@turf/turf`. All coordinates are `[longitude, latitude]` order throughout the stack.
-  Route handlers in `backend/routes/check.cjs` do the DB read, then delegate math to
-  `logic.cjs`.
+- **Geometry** runs in the browser in `frontend/src/geo.js`: point-in-area, nearest edge,
+  snapping trip ends into an area, and route-inside checks. All coordinates are
+  `[longitude, latitude]` order throughout the stack. `backend/services/logic.cjs` (a turf
+  wrapper) remains for the backend's own endpoints.
+- **Pricing** lives only in `frontend/src/pricing.js` (rates + time-of-day multipliers).
+  Tune rates there. Fare reports send the estimate the browser computed; the backend stores it
+  as-is and has no pricing logic.
 - **Data model:** `backend/models/ServiceArea.cjs` — `{ city, state, coordinates, last_update,
   is_active }`. `coordinates` is a single flat ring `[[lng, lat], ...]` (one polygon, no
-  holes). Queries filter on `is_active: true`. Polygons are seeded via `POST /api/service-areas`;
-  there is no seed script.
+  holes). Queries filter on `is_active: true`. Polygons are seeded via `POST /api/service-areas`.
+  `backend/models/FareReport.cjs` — a user-reported fare plus the trip and the model's
+  estimate; collected only, nothing reads it yet.
 - **API surface** (all under `/api`, mounted in `index.cjs`):
-  - `GET /service-areas` — active polygons (used on map load to draw fills/outlines)
-  - `POST /check-point` `{ long, lat }` → `{ "point-found": bool }`
-  - `POST /closest-point` `{ long, lat }` → `{ "closest-point": <turf point>, "closest-poly": <turf polygon> }`
-  - `POST /midpoint` `{ coordArr1, coordArr2 }` → `{ midpoint, distance }` (miles)
-  - `POST /check` — legacy/unused by the frontend
-- **Frontend structure:** everything is in `src/App.jsx` — a single `App` component with one
-  big `useEffect` that builds the Mapbox map, the `MapboxGeocoder`, service-area layers, and
-  the geocoder `result` handler that orchestrates marker + in/out check + closest-point line.
+  - `POST /fare-reports` — the only endpoint the frontend calls (rate-limited per IP)
+  - `GET`/`POST /service-areas` — read/seed polygons (the frontend uses the exported JSON instead)
+  - `/check-point`, `/closest-point`, `/midpoint`, `/check` — legacy, no longer called by
+    the frontend
+- **Frontend structure:** most of the UI is in `src/App.jsx` — a single `App` component with
+  one big `useEffect` that builds the Mapbox map, the `MapboxGeocoder`s, service-area layers,
+  and the geocoder `result` handler that orchestrates marker + in/out check + closest-point
+  line. `src/FareReport.jsx` is the "what did you pay?" form; `src/backend.js` holds the
+  backend URL and wake-up helpers.
   Mapbox objects (map, geocoder, current marker, current distance popup) are held in `useRef`
   and imperatively mutated; React state is not used for map interaction.
   UI chrome (title card, LA/SF/AZ fly-to buttons, geocoder container) is Headless UI

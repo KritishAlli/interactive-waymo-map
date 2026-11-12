@@ -6,7 +6,12 @@ import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 
 import './App.css'
 import DateTimePicker from './DateTimePicker.jsx'
-import { prepareAreas, snapTrip, checkRoute, areaSqMiles } from './geo.js'
+import { prepareAreas, snapTrip, checkRoute, areaSqMiles, isInAnyArea, nearestAreaEdge } from './geo.js'
+import { estimateFare } from './pricing.js'
+import { warmBackend } from './backend.js'
+// exported from MongoDB by backend/scripts/export-service-areas.cjs; bundled so the map
+// never waits on the backend
+import serviceAreasData from './data/service-areas.json'
 import LocateControl, { getPosition, locationErrorMessage } from './locate.js'
 import { tween, tweenPaint, drawLine, startRouteCar, pulseMarker, dropIn, pointAlongLine } from './animations.js'
 import AnimatedNumber from './AnimatedNumber.jsx'
@@ -54,10 +59,11 @@ function LocationArrowIcon() {
   );
 }
 const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
-const API_URL = import.meta.env.VITE_APP_API_URL || "";
 
-// Render's free plan spins the backend down after inactivity; the first request
-// triggers a cold start that can take 30-60s. Poll /health until it answers 200.
+const SERVICE_AREAS = serviceAreasData.serviceAreas;
+const AREAS = prepareAreas(SERVICE_AREAS); // prepared for client-side geometry (geo.js)
+const AREA_SIZES = Object.fromEntries(SERVICE_AREAS.map((a) => [a.city, areaSqMiles(a.coordinates)])); // sq mi
+
 // format a Date as the "YYYY-MM-DDTHH:mm" value a datetime-local input expects
 function toLocalInputValue(date) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -67,25 +73,15 @@ function toLocalInputValue(date) {
 
 const isNarrowScreen = () => window.matchMedia('(max-width: 768px)').matches;
 
-async function waitForBackend({ timeoutMs = 90000, intervalMs = 2000 } = {}) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(`${API_URL}/health`, { cache: "no-store" });
-      if (res.ok) return true;
-    } catch {
-      // network error = still cold starting, keep trying
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  return false;
-}
+// search pin: drop-in delay, and when it hits the ground (55% of the 0.6s pin-drop in App.css)
+const PIN_DROP_DELAY_MS = 350;
+const PIN_LANDS_MS = PIN_DROP_DELAY_MS + 330;
 
 
 function App() {
 
-  const [backendReady, setBackendReady] = useState(false);
-  const [backendTimedOut, setBackendTimedOut] = useState(false);
+  const [mapReady, setMapReady] = useState(false); // map style loaded and service areas drawn
+  const [slowLoad, setSlowLoad] = useState(false); // map is taking unusually long to load
   const [locationMessage, setLocationMessage] = useState(null); // locate-button errors
 
 
@@ -114,11 +110,9 @@ function App() {
   const pickupGeocoderRef = useRef();
   const dropoffGeocoderRef = useRef();
   const routeMarkersRef = useRef([]);
-  const areasRef = useRef(null); // service areas prepared for client-side geometry (geo.js)
   const [pickupLabel, setPickupLabel] = useState("");
   const [dropoffLabel, setDropoffLabel] = useState("");
   const [locatingFor, setLocatingFor] = useState(null); // "pickup" | "dropoff" | null
-  const [areaSizes, setAreaSizes] = useState({}); // city name -> square miles
 
   // fill the pickup or dropoff box with the device's location
   async function pickCurrentLocation(which) {
@@ -227,15 +221,6 @@ function App() {
     map.setPaintProperty('outline-' + city, 'line-color', on ? AREA_STYLE.lineColorHover : AREA_STYLE.lineColor);
   }
 
-  async function getAreas() {
-    if (!areasRef.current) {
-      const res = await fetch(`${API_URL}/api/service-areas`);
-      const data = await res.json();
-      areasRef.current = prepareAreas(data.serviceAreas);
-    }
-    return areasRef.current;
-  }
-
   function stopDashAnimation() {
     if (dashAnimationRef.current) cancelAnimationFrame(dashAnimationRef.current);
     dashAnimationRef.current = null;
@@ -281,17 +266,6 @@ function App() {
       setEstimateError("");
     }
     setMode(next);
-  }
-
-  async function postJSON(path, body) {
-    const res = await fetch(`${API_URL}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
-    return data;
   }
 
   // Mapbox Directions with alternatives; `excludes` are points the route must avoid.
@@ -457,22 +431,22 @@ function App() {
     setEstimate(null);
     clearRoute();
     try {
-      const areas = await getAreas();
-      const ends = snapTrip(pickup, dropoff, areas);
+      const ends = snapTrip(pickup, dropoff, AREAS);
       if (ends.error) throw new Error(ends.error);
 
-      const { route, staysInside } = await findInAreaRoute(ends.pickup.point, ends.dropoff.point, departAt, areas);
+      const { route, staysInside } = await findInAreaRoute(ends.pickup.point, ends.dropoff.point, departAt, AREAS);
       if (isNarrowScreen()) setSheetOpen(false); // show the route; price stays in the summary
       drawRoute(route, ends);
 
-      const data = await postJSON('/api/estimate-price', {
-        pickup: ends.pickup.point,
-        dropoff: ends.dropoff.point,
-        distanceMiles: route.distance / 1609.344,
-        durationMinutes: route.duration / 60,
-        departAt,
+      const distanceMiles = route.distance / 1609.344;
+      const durationMinutes = route.duration / 60;
+      setEstimate({
+        ...estimateFare(distanceMiles, durationMinutes, departAt),
+        distanceMiles,
+        durationMinutes,
+        ends,
+        staysInside,
       });
-      setEstimate({ ...data, ends, staysInside });
     } catch (err) {
       setEstimateError(err.message || "Something went wrong");
     } finally {
@@ -480,57 +454,29 @@ function App() {
     }
   }
 
-  async function isInsideBounds(long, lat) {
-    const res = await fetch(`${API_URL}/api/check-point`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({long: long, lat: lat}),
-
-    });
-    return res.json();
-  }
-  async function placeMarker(e) {
+  function placeMarker(e) {
     if (currentMarkerRef.current) {
       currentMarkerRef.current.remove();
     }
     var marker = dropIn(new mapboxgl.Marker({ color: COLORS.ink }).
-        setLngLat(e.result.center), 350) // land after the camera starts flying
+        setLngLat(e.result.center), PIN_DROP_DELAY_MS) // land after the camera starts flying
         marker._element.id = "selection";
         marker.addTo(mapRef.current);
       currentMarkerRef.current = marker;
 
   }
-  async function placeMidpointDistancePopup(coordArr1, coordArr2) {
-    if (currentDistancePopupRef.current) {
-      currentDistancePopupRef.current.remove();
-    }
-    const res = await fetch(`${API_URL}/api/midpoint`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({coordArr1: coordArr1, coordArr2: coordArr2}),
-
-    });
-    const data = await res.json();
-
-    var popup = new mapboxgl.Marker({
-      element: distancePill(data.distance),
-      anchor: "center"
-    })
-  .setLngLat(data.midpoint.geometry.coordinates)
-    popup.addTo(mapRef.current);
-
-    currentDistancePopupRef.current = popup;
+  // distance pill halfway along the dashed line
+  function placeMidpointDistancePopup(from, to, miles) {
+    currentDistancePopupRef.current?.remove();
+    const mid = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2];
+    currentDistancePopupRef.current = new mapboxgl.Marker({ element: distancePill(miles), anchor: "center" })
+      .setLngLat(mid)
+      .addTo(mapRef.current);
   }
-  async function getClosestPointLine(long, lat) {
-
-    const res = await fetch(`${API_URL}/api/closest-point`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({long: long, lat: lat}),
-
-    });
-    
-    const data = await res.json();
+  // dashed line from an address outside every service area to the nearest area edge
+  function getClosestPointLine(long, lat) {
+    const nearest = nearestAreaEdge([long, lat], AREAS);
+    if (!nearest) return;
     if (mapRef.current.getSource('closest-point-route')) {
       mapRef.current.removeLayer('line-dashed');
       mapRef.current.removeSource('closest-point-route');
@@ -544,12 +490,12 @@ function App() {
           type: 'LineString',
           coordinates: [
             [long, lat],
-            data["closest-point"].geometry.coordinates
+            nearest.point
           ]
         }
       }
     });
-    placeMidpointDistancePopup([long, lat], data["closest-point"].geometry.coordinates);
+    placeMidpointDistancePopup([long, lat], nearest.point, nearest.miles);
     
 
 
@@ -652,13 +598,10 @@ function App() {
   }, [estimate]);
 
   useEffect(() => {
-    let cancelled = false;
-    waitForBackend().then((ok) => {
-      if (cancelled) return;
-      if (ok) setBackendReady(true);
-      else setBackendTimedOut(true);
-    });
-    return () => { cancelled = true; };
+    // nothing waits on the backend; just start waking it for fare reports
+    warmBackend();
+    const slowTimer = setTimeout(() => setSlowLoad(true), 15000);
+    return () => clearTimeout(slowTimer);
   }, []);
 
   useEffect(() => {
@@ -674,18 +617,10 @@ function App() {
     });
 
 
-    mapRef.current.on('load', async () => {
-      // backend may still be cold-starting when the map finishes loading
-      await waitForBackend();
-      const res = await fetch(`${API_URL}/api/service-areas`);
-
-      const data = await res.json();
-      areasRef.current = prepareAreas(data.serviceAreas);
-      setAreaSizes(Object.fromEntries(
-        data.serviceAreas.map((a) => [a.city, areaSqMiles(a.coordinates)])
-      ));
-
+    mapRef.current.on('load', () => {
+      const data = { serviceAreas: SERVICE_AREAS };
       const map = mapRef.current;
+      setMapReady(true);
 
       // one world-sized polygon with every service area cut out as a hole
       map.addSource('outside-mask', {
@@ -763,7 +698,6 @@ function App() {
     }
   );
 
-    // available right away, not only after the backend wakes up
     mapRef.current.addControl(new LocateControl(setLocationMessage), 'bottom-left');
   
       geocoderRef.current = new MapboxGeocoder({
@@ -854,19 +788,21 @@ function App() {
       currentPulseRef.current?.remove();
       currentPulseRef.current = null;
 
-        (isInsideBounds(e.result.center[0], e.result.center[1])).then(result => {
-          // ripple under the pin: teal = covered, gray = outside; keep the pin on top
-          const map = mapRef.current;
+        // ripple under the pin: teal = covered, gray = outside; keep the pin on top.
+        // Wait for the pin to land (dropIn delay + impact); skip if it's been replaced or cleared.
+        const marker = currentMarkerRef.current;
+        const inside = isInAnyArea(e.result.center, AREAS);
+        setTimeout(() => {
+          if (currentMarkerRef.current !== marker || !marker) return;
           currentPulseRef.current?.remove();
-          currentPulseRef.current = pulseMarker(map, e.result.center, result["point-found"]);
-          const pin = currentMarkerRef.current?.getElement();
+          currentPulseRef.current = pulseMarker(mapRef.current, e.result.center, inside);
+          const pin = marker.getElement();
           pin?.parentNode?.appendChild(pin);
 
-          if (!result["point-found"]) {
+          if (!inside) {
             getClosestPointLine(e.result.center[0], e.result.center[1]);
           }
-
-        });
+        }, PIN_LANDS_MS);
 
       }
       )
@@ -886,14 +822,14 @@ function App() {
       mapRef.current.remove()
     }
   }, [])
-  const cityList = CITIES.map((city) => ({ ...city, sqmi: areaSizes[city.name] }));
+  const cityList = CITIES.map((city) => ({ ...city, sqmi: AREA_SIZES[city.name] }));
 
   return (
     <div className="app">
 
       {!loadingGone && (
         <div
-          className={`loading-screen${backendReady ? " leaving" : ""}`}
+          className={`loading-screen${mapReady ? " leaving" : ""}`}
           role="status"
           aria-live="polite"
           onAnimationEnd={(e) => { if (e.animationName === "loading-out") setLoadingGone(true); }}
@@ -901,9 +837,9 @@ function App() {
           <h1 className="loading-title">Waymo Trip Calculator</h1>
           <div className="loading-bar"><span /></div>
           <div className="loading-text">
-            {backendTimedOut
+            {slowLoad
               ? "This is taking longer than usual. Hang tight, or try refreshing."
-              : "Loading service areas…"}
+              : "Loading map…"}
           </div>
         </div>
       )}
@@ -921,7 +857,7 @@ function App() {
 
       <aside
         ref={sheetRef}
-        className={`panel search-card${sheetOpen ? "" : " collapsed"}${backendReady ? " entered" : ""}`}
+        className={`panel search-card${sheetOpen ? "" : " collapsed"}${mapReady ? " entered" : ""}`}
         aria-label="Search and fare estimates"
         onTouchStart={onSheetTouchStart}
         onTouchMove={onSheetTouchMove}

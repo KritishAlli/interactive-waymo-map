@@ -9,8 +9,7 @@ const router = express.Router();
 const { isPointInBound , getDistance, isPointInAnyBound, getClosestPolygonPoint, getMidpoint, getTwoPointDistance} = require("../services/logic.cjs");
 const FareReport = require('../models/FareReport.cjs');
 const { rateLimit } = require("express-rate-limit");
-const { estimateFare } = require("../services/pricing.cjs");
-// active service areas, cached in memory so pricing requests skip the MongoDB round trip
+// active service areas, cached in memory so fare reports skip the MongoDB round trip
 const AREA_CACHE_MS = 5 * 60 * 1000;
 let areaCache = { at: 0, areas: null };
 async function getActiveAreas() {
@@ -69,31 +68,6 @@ router.post("/midpoint", async (req, res) => {
   res.json({ "midpoint": midpoint, "distance": distance});
 
 })
-// estimate the fare for a trip. The frontend supplies the driving distance/duration
-// (from Mapbox Directions); this checks both ends are serviceable and prices it.
-router.post("/estimate-price", async (req, res) => {
-  const { pickup, dropoff, distanceMiles, durationMinutes, departAt } = req.body;
-  const validCoord = (c) => Array.isArray(c) && c.length === 2 && c.every(Number.isFinite);
-  if (!validCoord(pickup) || !validCoord(dropoff) ||
-      !Number.isFinite(distanceMiles) || !Number.isFinite(durationMinutes) ||
-      distanceMiles < 0 || durationMinutes < 0) {
-    return res.status(400).json({ error: "pickup, dropoff, distanceMiles and durationMinutes are required" });
-  }
-
-  const coords = await getActiveAreaCoords();
-  const pickupInArea = coords.length > 0 && isPointInAnyBound(pickup[0], pickup[1], coords);
-  const dropoffInArea = coords.length > 0 && isPointInAnyBound(dropoff[0], dropoff[1], coords);
-
-  res.json({
-    serviceable: pickupInArea && dropoffInArea,
-    pickupInArea,
-    dropoffInArea,
-    distanceMiles,
-    durationMinutes,
-    ...estimateFare(distanceMiles, durationMinutes, departAt),
-  });
-})
-
 // limits fare reports per client IP to keep spam out of the dataset. Counts are held in
 // memory only (IPs are never stored with reports) and reset when the server restarts.
 const fareReportLimiter = rateLimit({
@@ -104,13 +78,20 @@ const fareReportLimiter = rateLimit({
   message: { error: "Too many fare reports. Please try again later." },
 });
 
-// a user reports what they actually paid for an estimated trip. The estimate is recomputed
-// here (not taken from the client) so every report records what the model predicted.
+// a user reports what they actually paid for an estimated trip. Pricing lives only in the
+// frontend (frontend/src/pricing.js), so the browser sends the estimate the app made for
+// that trip and ride time; it's stored as-is next to the paid amount.
 router.post("/fare-reports", fareReportLimiter, async (req, res) => {
-  const { pickup, dropoff, distanceMiles, durationMinutes, departAt, paid } = req.body;
+  const { pickup, dropoff, distanceMiles, durationMinutes, departAt, paid, fare } = req.body;
   const validCoord = (c) => Array.isArray(c) && c.length === 2 && c.every(Number.isFinite);
+  const validMoney = (n) => Number.isFinite(n) && n > 0 && n <= 1000;
   const when = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(typeof departAt === "string" ? departAt : "");
-  if (!validCoord(pickup) || !validCoord(dropoff) || !when ||
+  const validFare = fare && typeof fare === "object" &&
+    validMoney(fare.estimate) && validMoney(fare.low) && validMoney(fare.high) &&
+    fare.low <= fare.estimate && fare.estimate <= fare.high &&
+    Number.isFinite(fare.multiplier) && fare.multiplier > 0 && fare.multiplier <= 5 &&
+    typeof fare.timeLabel === "string" && fare.timeLabel.length > 0 && fare.timeLabel.length <= 40;
+  if (!validCoord(pickup) || !validCoord(dropoff) || !when || !validFare ||
       !Number.isFinite(distanceMiles) || distanceMiles <= 0 || distanceMiles > 200 ||
       !Number.isFinite(durationMinutes) || durationMinutes <= 0 || durationMinutes > 600 ||
       !Number.isFinite(paid) || paid < 1 || paid > 500) {
@@ -120,7 +101,6 @@ router.post("/fare-reports", fareReportLimiter, async (req, res) => {
   const [, y, m, d, h] = when.map(Number);
   const areas = await getActiveAreas();
   const pickupArea = areas.find((area) => isPointInAnyBound(pickup[0], pickup[1], [area.coordinates]));
-  const fare = estimateFare(distanceMiles, durationMinutes, departAt);
 
   await FareReport.create({
     paid: Math.round(paid * 100) / 100,
