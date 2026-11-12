@@ -55,8 +55,8 @@ There is no test suite anywhere in the repo.
   new backend files `.cjs`.
 - **Geometry** runs in the browser in `frontend/src/geo.js`: point-in-area, nearest edge,
   snapping trip ends into an area, and route-inside checks. All coordinates are
-  `[longitude, latitude]` order throughout the stack. `backend/services/logic.cjs` (a turf
-  wrapper) remains for the backend's own endpoints.
+  `[longitude, latitude]` order throughout the stack. `backend/services/logic.cjs` (turf)
+  only tags fare reports with their pickup city.
 - **Pricing** lives only in `frontend/src/pricing.js` (rates + time-of-day multipliers).
   Tune rates there. Fare reports send the estimate the browser computed; the backend stores it
   as-is and has no pricing logic.
@@ -68,8 +68,6 @@ There is no test suite anywhere in the repo.
 - **API surface** (all under `/api`, mounted in `index.cjs`):
   - `POST /fare-reports` — the only endpoint the frontend calls (rate-limited per IP)
   - `GET`/`POST /service-areas` — read/seed polygons (the frontend uses the exported JSON instead)
-  - `/check-point`, `/closest-point`, `/midpoint`, `/check` — legacy, no longer called by
-    the frontend
 - **Frontend structure:** most of the UI is in `src/App.jsx` — a single `App` component with
   one big `useEffect` that builds the Mapbox map, the `MapboxGeocoder`s, service-area layers,
   and the geocoder `result` handler that orchestrates marker + in/out check + closest-point

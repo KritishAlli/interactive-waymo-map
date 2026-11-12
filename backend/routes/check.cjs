@@ -1,12 +1,10 @@
 const express = require("express");
 require('dotenv').config();
 const ServiceArea = require('../models/ServiceArea.cjs');
-//delete later
-const turf = require("@turf/turf");
 
 const router = express.Router();
 
-const { isPointInBound , getDistance, isPointInAnyBound, getClosestPolygonPoint, getMidpoint, getTwoPointDistance} = require("../services/logic.cjs");
+const { isPointInAnyBound } = require("../services/logic.cjs");
 const FareReport = require('../models/FareReport.cjs');
 const { rateLimit } = require("express-rate-limit");
 // active service areas, cached in memory so fare reports skip the MongoDB round trip
@@ -19,18 +17,6 @@ async function getActiveAreas() {
   }
   return areaCache.areas;
 }
-async function getActiveAreaCoords() {
-  return (await getActiveAreas()).map((area) => area.coordinates);
-}
-
-router.post("/check", async (req, res) => {
-    const { long, lat } = req.body;
-    //return all service areas
-    // await and async used because .find can take a while, so wait for this line to finish before moving on
-    const serviceAreas = await ServiceArea.find({is_active: true});
-    const out = serviceAreas[0].coordinates;
-    res.json({ serviceAreas });
-})
 
 // add service areas
 router.post("/service-areas", async (req, res) => {
@@ -43,30 +29,6 @@ router.post("/service-areas", async (req, res) => {
 router.get("/service-areas", async (req, res) => {
   const serviceAreas = await ServiceArea.find({is_active: true});
   res.json({ serviceAreas });
-})
-router.post("/check-point", async (req, res) => {
-  const { long, lat } = req.body;
-  const serviceAreas = await ServiceArea.find({}, {is_active: true, coordinates: true});
-  const coords = serviceAreas.map(area => area.coordinates);
-  const outBool = isPointInAnyBound(long, lat, coords)
-  res.json({ "point-found": outBool });
-
-})
-router.post("/closest-point", async (req, res) => {
-  const { long, lat } = req.body;
-  const serviceAreas = await ServiceArea.find({}, {is_active: true, coordinates: true});
-  const coords = serviceAreas.map(area => area.coordinates);
-  const result = getClosestPolygonPoint(long, lat, coords);
-
-  res.json({ "closest-point": result[0], "closest-poly": result[1] });
-
-})
-router.post("/midpoint", async (req, res) => {
-  const { coordArr1, coordArr2 } = req.body;
-  const midpoint = getMidpoint(coordArr1, coordArr2);
-  const distance = getTwoPointDistance(coordArr1, coordArr2);
-  res.json({ "midpoint": midpoint, "distance": distance});
-
 })
 // limits fare reports per client IP to keep spam out of the dataset. Counts are held in
 // memory only (IPs are never stored with reports) and reset when the server restarts.
