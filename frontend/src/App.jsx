@@ -725,6 +725,7 @@ function App() {
           accessToken: mapboxgl.accessToken,
           useBrowserFocus: true,
           mapboxgl: mapboxgl,
+          countries: 'us', // every service area is in the US
           placeholder: 'Search an address',
       });
       geocoderRef.current.addTo(geocoderContainerRef.current);
@@ -746,6 +747,7 @@ function App() {
           mapboxgl: mapboxgl,
           marker: false,
           flyTo: false,
+          countries: 'us',
           placeholder,
         });
         g.addTo(container);
@@ -761,6 +763,17 @@ function App() {
         (c, label) => { setPickup(c); setPickupLabel(label); });
       dropoffGeocoderRef.current = makeRouteGeocoder('Where to?', dropoffContainerRef.current,
         (c, label) => { setDropoff(c); setDropoffLabel(label); });
+
+      // rank results near what's on screen first. The geocoders live in the panel rather
+      // than on the map, so their built-in trackProximity never sees the map; do it here.
+      const syncProximity = () => {
+        const { lng, lat } = mapRef.current.getCenter();
+        for (const g of [geocoderRef.current, pickupGeocoderRef.current, dropoffGeocoderRef.current]) {
+          g?.setProximity({ longitude: lng, latitude: lat });
+        }
+      };
+      syncProximity();
+      mapRef.current.on('moveend', syncProximity);
 
       // panning the map on a phone tucks the sheet away, like most map apps
       mapRef.current.on('dragstart', () => {
