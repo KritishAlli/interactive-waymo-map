@@ -479,7 +479,7 @@ function App() {
       const distanceMiles = route.distance / 1609.344;
       const durationMinutes = route.duration / 60;
       setEstimate({
-        ...estimateFare(distanceMiles, durationMinutes, departAt),
+        ...estimateFare(distanceMiles, durationMinutes, departAt, ends.city),
         distanceMiles,
         durationMinutes,
         ends,

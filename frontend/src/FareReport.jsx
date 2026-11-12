@@ -37,7 +37,7 @@ export default function FareReport({ estimate, departAt }) {
       }
       // what the app predicts for this trip at the time they rode (may differ from the
       // departure above when "Another time" is picked); the backend stores it as-is
-      const fare = estimateFare(estimate.distanceMiles, estimate.durationMinutes, rideAt);
+      const fare = estimateFare(estimate.distanceMiles, estimate.durationMinutes, rideAt, estimate.ends.city);
       const res = await fetch(`${API_URL}/api/fare-reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
