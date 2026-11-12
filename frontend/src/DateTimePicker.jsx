@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid'
 
 // Departure picker: a date chip that opens a month calendar and a time chip that opens
 // an analog clock. Value in/out is a local "YYYY-MM-DDTHH:mm" string (same as <input type="datetime-local">).
@@ -48,9 +49,9 @@ function Calendar({ value, onPick }) {
   return (
     <div className="dtp-calendar">
       <div className="dtp-cal-head">
-        <button type="button" className="dtp-nav" onClick={() => shift(-1)} aria-label="Previous month">‹</button>
+        <button type="button" className="dtp-nav" onClick={() => shift(-1)} aria-label="Previous month"><ChevronLeftIcon width={20} height={20} aria-hidden="true" /></button>
         <div className="dtp-cal-title">{MONTHS[view.mo]} {view.y}</div>
-        <button type="button" className="dtp-nav" onClick={() => shift(1)} aria-label="Next month">›</button>
+        <button type="button" className="dtp-nav" onClick={() => shift(1)} aria-label="Next month"><ChevronRightIcon width={20} height={20} aria-hidden="true" /></button>
       </div>
       <div className="dtp-cal-grid">
         {WEEKDAYS.map((w, i) => <div key={i} className="dtp-weekday">{w}</div>)}

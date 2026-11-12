@@ -163,3 +163,14 @@ export function checkRoute(coords, areas) {
     excludePoints,
   };
 }
+
+// Area of a single ring in square miles (shoelace on the same flat projection as above).
+export function areaSqMiles(ring) {
+  const lat0 = ring.reduce((s, [, y]) => s + y, 0) / ring.length;
+  const kx = MILES_PER_DEG_LAT * Math.cos((lat0 * Math.PI) / 180);
+  let twice = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    twice += ring[j][0] * kx * ring[i][1] * MILES_PER_DEG_LAT - ring[i][0] * kx * ring[j][1] * MILES_PER_DEG_LAT;
+  }
+  return Math.abs(twice) / 2;
+}

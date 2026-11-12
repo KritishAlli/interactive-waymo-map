@@ -4,51 +4,18 @@
   height: 100%;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: 100%;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-
-.container {
-  position: relative; 
-  width: 400px;
-  height: 400px;
-  margin: 20px auto; /* Center the container */
-  background-color: #f0f0f0; /* Light background for contrast */
-  border: 2px solid #ccc;
-}
 .map-container {
   position: absolute;
   top: 0;
@@ -56,10 +23,13 @@
   flex: 1;
   width: 100%;
   min-height: 100dvh;
-
-
 }
+/* mapbox-gl sets its own font on the map; floating UI inside it should use ours */
+.mapboxgl-map { font-family: var(--font-sans); }
 
+[hidden] { display: none !important; }
+
+/* ---------- loading ---------- */
 .loading-screen {
   position: fixed;
   inset: 0;
@@ -68,178 +38,245 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  background-color: #ffffff;
-  color: #000000;
-  font-weight: bold;
-  font-size: 16px;
+  gap: var(--space-3);
+  padding: 0 var(--space-6);
+  background-color: var(--app-bg);
   text-align: center;
-  padding: 0 24px;
 }
-
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 4px solid rgba(255, 128, 0, 0.25);
-  border-top-color: #FF8000;
-  animation: logo-spin 1s linear infinite;
+.loading-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--text);
 }
-
+.loading-text {
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  max-width: 300px;
+}
+.loading-bar {
+  position: relative;
+  width: 180px;
+  height: 4px;
+  margin: var(--space-3) 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background-color: var(--gray-200);
+  overflow: hidden;
+}
+.loading-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background-color: var(--accent);
+  animation: loading-slide 1.2s var(--ease) infinite;
+}
+@keyframes loading-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .loading-spinner { animation-duration: 2s; }
+  .loading-bar span { animation-duration: 3s; }
 }
-.overlap {
-  /* cards are always white; keep native controls (buttons, geocoder input) in light mode */
+
+/* ---------- panel (left sidebar on desktop, top sheet on mobile) ---------- */
+.panel {
+  /* keep native controls (buttons, geocoder input) in light mode */
   color-scheme: light;
   position: absolute;
-  width: min(350px, calc(100vw - 32px));
-  height: auto;
-  max-height: calc(100dvh - 80px);
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 1;
+  width: 400px;
+  max-height: calc(100dvh - 2 * var(--space-4));
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
-  
-  color: rgb(255, 255, 255);
-  font-weight: bold;
-  font-size: 16px;
-  border-radius: 30px; 
-  border-color: white;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-300) transparent;
+  background-color: var(--app-bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
 }
 
-.title-card {
-  background-color: #ffffff; 
-  opacity: 100%;
-  top: clamp(12px, 3vw, 50px);
-  left: clamp(12px, 3vw, 50px);
-  height: fit-content;
-  align-content: center;
-  z-index: 1; 
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-  
-}
-.locations-card {
-  background-color: #ffffff; 
-  align-items: center;
-  height: fit-content;
-  opacity: 100%;
-  width: min(350px, calc(100vw - 32px));
-  display: flex;
-  flex-wrap: wrap;
-  flex-direction: row;
-  
-  gap: 8px;
-  padding: 8px 0;
-  justify-content: center;
-
-  top: clamp(150px, 3vw, 150px);
-  left: clamp(12px, 3vw, 75px);
-  z-index: 1; 
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-  
-}
-.search-card {
-  background-color: #ffffff; 
-  height: fit-content;
-  width: min(350px, calc(100vw - 32px));
-  opacity: 100%;
-  top: clamp(50px, 3vw, 150px);
-  /* reset <fieldset> defaults */
-  border: 0;
-  padding: 0;
+.panel-header { padding: var(--space-3) var(--space-1) var(--space-2); }
+.brand-title {
   margin: 0;
-  min-width: 0;
-  overflow: visible;
-  right: clamp(25px, 3vw, 150px);
-  z-index: 1; 
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-  justify-content: stretch;
-  border-radius: 15px; 
-  
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
-.text-block {
-  color: rgb(0, 0, 0);
-  font-weight: normal;
-  align-content: center;
-  font-size: 30px;
-  padding-top: 15px;
-}
-.small-text-block {
-  font-size: 15px;
-  font-weight: lighter;
-
+.brand-tagline {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-md);
+  color: var(--text-secondary);
 }
 
-.geocoder-container {
-  width: 100%;
-  background-color: rgb(255, 255, 255);
-  border-radius: 15px;
-}
-/* fill the card; the card supplies the shadow and rounded corners */
-.geocoder-container .mapboxgl-ctrl-geocoder {
-  width: 100%;
-  min-width: 0;
-  max-width: none;
-  box-shadow: none;
-  border-radius: 15px;
-}
-.geocoder-container .mapboxgl-ctrl-geocoder .suggestions {
-  border-radius: 12px;
-}
-[hidden] { display: none !important; }
-
-/* search card: mode toggle + route price estimation */
-.search-card {
-  padding: 8px;
-  gap: 8px;
-  color: #000000;
-}
+/* ---------- mode toggle: pill segmented control ---------- */
 .mode-toggle {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   padding: 4px;
-  background-color: #f1f1f1;
-  border-radius: 12px;
+  background-color: var(--gray-200);
+  border-radius: var(--radius-full);
 }
 .mode-tab {
   -webkit-appearance: none;
   appearance: none;
   flex: 1;
+  min-height: 40px;
   border: 0;
-  border-radius: 9px;
-  padding: 8px 10px;
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-3);
   background: transparent;
-  color: #555555;
+  color: var(--text-secondary);
   font: inherit;
-  font-size: 14px;
-  font-weight: bold;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
   cursor: pointer;
+  transition: color 0.15s var(--ease), background-color 0.15s var(--ease);
+}
+@media (hover: hover) {
+  .mode-tab:hover:not(.active) { color: var(--text); }
 }
 .mode-tab.active {
-  background-color: #ffffff;
-  color: #000000;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  background-color: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
+
+/* ---------- geocoder: white pill inputs ---------- */
+.geocoder-container { width: 100%; }
+/* The geocoder wrapper also contains the suggestion list (in normal flow, see below), so it
+   grows as suggestions arrive. Keep it invisible; the white pill + focus ring live on the
+   input itself, and the icons are positioned against the 52px input, not the wrapper. */
+.geocoder-container .mapboxgl-ctrl-geocoder {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 20px;
+}
+.geocoder-container .mapboxgl-ctrl-geocoder--input {
+  height: 52px;
+  padding: 0 44px 0 50px;
+  border-radius: var(--radius-full);
+  background-color: var(--surface);
+  font-family: var(--font-sans);
+  font-size: 17px;               /* >= 16px stops iOS zooming on focus */
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  transition: box-shadow 0.15s var(--ease);
+}
+.geocoder-container .mapboxgl-ctrl-geocoder--input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.geocoder-container .mapboxgl-ctrl-geocoder--input::placeholder {
+  color: var(--text-secondary);
+  font-weight: var(--weight-regular);
+}
+/* icons are pinned from the top so they stay centered on the 52px input even when the
+   wrapper grows to hold the suggestion list */
+.geocoder-container .mapboxgl-ctrl-geocoder--icon-search {
+  top: 15px;              /* (52 - 22) / 2 */
+  left: 18px;
+  width: 22px;
+  height: 22px;
+  fill: var(--text);
+}
+.geocoder-container .mapboxgl-ctrl-geocoder--pin-right > * {
+  top: 14px;              /* (52 - 24) / 2 */
+  right: 14px;
+  height: 24px;
+}
+.geocoder-container .mapboxgl-ctrl-geocoder--button {
+  width: 24px;
+  padding: 0;
+  background: transparent;
+}
+.geocoder-container .mapboxgl-ctrl-geocoder--icon-close {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  fill: var(--text-secondary);
+}
+.geocoder-container .mapboxgl-ctrl-geocoder--icon-loading {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  fill: var(--text-tertiary);
+}
+
+/* the panel scrolls, so an absolutely-positioned suggestion list would be clipped inside it;
+   put the list in normal flow so it pushes content down and scrolls with the panel */
+.geocoder-container .mapboxgl-ctrl-geocoder .suggestions {
+  position: static;
+  margin-top: var(--space-2);
+  padding: var(--space-1) 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-md);
+}
+.geocoder-container .mapboxgl-ctrl-geocoder .suggestions > li > a {
+  padding: 10px var(--space-4);
+}
+.mapboxgl-ctrl-geocoder .suggestions > .active > a,
+.mapboxgl-ctrl-geocoder .suggestions > li > a:hover {
+  background-color: var(--gray-50);
+}
+.mapboxgl-ctrl-geocoder--suggestion-title { color: var(--text); font-weight: var(--weight-semibold); }
+.mapboxgl-ctrl-geocoder--suggestion-address { color: var(--text-secondary); }
+
+/* ---------- route panel ---------- */
 .route-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
-.route-geocoder {
-  position: relative;
-  border: 1px solid #e0e0e0;
-}
-/* keep the focused box's suggestion list above the box below it */
-.route-geocoder:focus-within { z-index: 5; }
+.route-geocoder { position: relative; }
 .route-field:focus-within { position: relative; z-index: 5; }
 
 /* address box + "use current location" button */
 .route-field {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .route-field .route-geocoder { flex: 1; min-width: 0; }
+
+/* pickup / dropoff markers in place of the search icon, matching the map pins */
+.route-geocoder .mapboxgl-ctrl-geocoder--icon-search { display: none; }
+.route-geocoder::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 26px;              /* center of the 52px input */
+  left: 22px;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.route-field.pickup .route-geocoder::before { border: 3px solid var(--text); }
+.route-field.dropoff .route-geocoder::before { background-color: var(--accent); border-radius: 3px; }
+.route-geocoder .mapboxgl-ctrl-geocoder--input { padding-left: 48px; }
+
 .current-location-btn {
   -webkit-appearance: none;
   appearance: none;
@@ -248,37 +285,40 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 38px;                 /* geocoder input (36px) + its 1px border */
+  width: 52px;
+  height: 52px;
   padding: 0;
-  border: 1px solid #e0e0e0;
-  border-radius: 15px;
-  background-color: #ffffff;
-  color: #1a73e8;
+  border: 0;
+  border-radius: var(--radius-full);
+  background-color: var(--surface);
+  color: var(--text);
   cursor: pointer;
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
 }
-.current-location-btn:active:not(:disabled) { background-color: #e8f0fe; }
-.current-location-btn:disabled { cursor: default; }
-.current-location-btn:disabled:not(:has(.mini-spinner)) { color: #b0c4e8; }
 @media (hover: hover) {
-  .current-location-btn:hover:not(:disabled) { border-color: #1a73e8; }
+  .current-location-btn:hover:not(:disabled) { color: var(--accent-text); }
 }
-/* the geocoder's input grows to 50px below 640px wide */
-@media (max-width: 639px) {
-  .current-location-btn { height: 52px; }
-}
+.current-location-btn:active:not(:disabled) { background-color: var(--accent-soft); }
+.current-location-btn:disabled { cursor: default; }
+.current-location-btn:disabled:not(:has(.mini-spinner)) { color: var(--text-tertiary); }
 .mini-spinner {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid rgba(26, 115, 232, 0.25);
-  border-top-color: #1a73e8;
-  animation: logo-spin 0.8s linear infinite;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
 }
-/* departure date/time picker */
-.dtp { display: flex; flex-direction: column; gap: 6px; font-weight: normal; }
-.dtp-label { font-size: 13px; font-weight: bold; color: #555555; padding: 0 4px; }
-.dtp-chips { display: flex; gap: 6px; }
+
+/* ---------- departure date/time picker ---------- */
+.dtp { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-1); }
+.dtp-label {
+  padding: 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+.dtp-chips { display: flex; gap: var(--space-2); }
 .dtp button {
   -webkit-appearance: none;
   appearance: none;
@@ -290,120 +330,130 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  background-color: #ffffff;
-  color: #000000;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  font-size: 14px;
+  gap: var(--space-2);
+  height: 48px;
+  padding: 0 var(--space-4);
+  background-color: var(--surface);
+  color: var(--text);
+  border: 0;
+  border-radius: var(--radius-full);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  transition: box-shadow 0.15s var(--ease);
 }
-.dtp-chip svg { color: #FF8000; flex: none; }
-.dtp-chip.open { border-color: #FF8000; box-shadow: 0 0 0 2px rgba(255, 128, 0, 0.2); }
+.dtp-chip svg { color: var(--text); flex: none; }
+.dtp-chip.open { box-shadow: 0 0 0 2px var(--accent); }
 .dtp-now {
   flex: none;
-  padding: 0 12px;
-  background-color: #fff3e6;
-  color: #c96200;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: bold;
+  height: 48px;
+  padding: 0 var(--space-4);
+  background-color: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+@media (hover: hover) {
+  .dtp-now:hover { border-color: var(--text-secondary); }
 }
 .dtp-popover {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  background-color: #fafafa;
-  border: 1px solid #ececec;
-  border-radius: 14px;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background-color: var(--surface);
+  border-radius: var(--radius-lg);
 }
 
 /* calendar */
-.dtp-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.dtp-cal-title { font-size: 15px; font-weight: bold; color: #000000; }
+.dtp-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
+.dtp-cal-title { font-size: var(--text-lg); font-weight: var(--weight-semibold); color: var(--text); }
 .dtp-nav {
-  width: 32px;
-  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 36px;
+  height: 36px;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: transparent;
-  color: #333333;
-  font-size: 22px;
-  line-height: 1;
+  color: var(--text);
 }
-.dtp-nav:active { background-color: #eeeeee; }
+.dtp-nav:active { background-color: var(--gray-200); }
 @media (hover: hover) {
-  .dtp-nav:hover { background-color: #eeeeee; }
+  .dtp-nav:hover { background-color: var(--gray-100); }
 }
 .dtp-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
-.dtp-weekday { font-size: 12px; font-weight: bold; color: #999999; padding: 4px 0; }
+.dtp-weekday { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--text-tertiary); padding: var(--space-1) 0; }
 .dtp-day {
   aspect-ratio: 1;
-  border: 1px solid transparent;
-  border-radius: 50%;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-full);
   background: transparent;
-  color: #000000;
-  font-size: 14px;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
   padding: 0;
 }
-.dtp-day:active:not(:disabled):not(.selected) { background-color: #fff3e6; }
+.dtp-day:active:not(:disabled):not(.selected) { background-color: var(--gray-100); }
 @media (hover: hover) {
-  .dtp-day:hover:not(:disabled):not(.selected) { background-color: #fff3e6; }
+  .dtp-day:hover:not(:disabled):not(.selected) { background-color: var(--gray-100); }
 }
-.dtp-day.today { border-color: #FF8000; }
-.dtp-day.selected { background-color: #FF8000; color: #ffffff; font-weight: bold; }
-.dtp-day:disabled { color: #c8c8c8; cursor: default; }
+.dtp-day.today { border-color: var(--accent); }
+.dtp-day.selected { background-color: var(--accent); color: var(--gray-0); font-weight: var(--weight-semibold); }
+.dtp-day:disabled { color: var(--gray-300); cursor: default; }
 
 /* clock */
 .dtp-clock {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  gap: var(--space-4);
 }
-.dtp-clock-head { display: flex; align-items: center; gap: 12px; }
+.dtp-clock-head { display: flex; align-items: center; gap: var(--space-3); }
 .dtp-readout { display: flex; align-items: center; gap: 2px; }
 .dtp-digit {
-  min-width: 58px;
+  min-width: 62px;
   padding: 6px 8px;
   border: 0;
-  border-radius: 10px;
-  background-color: #f2f2f7;
-  color: #1c1c1e;
-  font-size: 34px;
-  font-weight: 300;
-  letter-spacing: -0.5px;
-  line-height: 1.1;
+  border-radius: var(--radius-md);
+  background-color: var(--gray-100);
+  color: var(--text);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
-  transition: background-color 0.15s, color 0.15s;
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
 }
-.dtp-digit.active { background-color: rgba(255, 128, 0, 0.14); color: #e06f00; }
-.dtp-colon { font-size: 30px; font-weight: 300; color: #1c1c1e; padding-bottom: 3px; }
+.dtp-digit.active { background-color: var(--accent-soft); color: var(--accent-text); }
+.dtp-colon { font-size: var(--text-xl); font-weight: var(--weight-semibold); color: var(--text-tertiary); padding-bottom: 3px; }
 
-/* iOS-style segmented control */
+/* AM/PM: same pill segmented look as the mode toggle */
 .dtp-segmented {
   display: flex;
-  padding: 2px;
-  background-color: #eeeef0;
-  border-radius: 9px;
+  padding: 3px;
+  background-color: var(--gray-100);
+  border-radius: var(--radius-full);
 }
 .dtp-segmented button {
   border: 0;
   background: transparent;
-  color: #1c1c1e;
-  padding: 5px 11px;
-  border-radius: 7px;
-  font-size: 13px;
-  font-weight: 500;
-  transition: background-color 0.15s, box-shadow 0.15s;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
 }
 .dtp-segmented button.active {
-  background-color: #ffffff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04);
+  background-color: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 .dtp-face {
@@ -413,137 +463,252 @@
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.1));
 }
-.dtp-face-bg { fill: #ffffff; stroke: #e5e5ea; stroke-width: 1; }
-.dtp-tick { stroke: #d1d1d6; stroke-width: 0.8; stroke-linecap: round; }
-.dtp-tick.major { stroke: #8e8e93; stroke-width: 1.2; }
-.dtp-hand { stroke: #FF8000; stroke-width: 1.5; stroke-linecap: round; }
-.dtp-knob { fill: #FF8000; }
-.dtp-hub { fill: #FF8000; }
-.dtp-hub-center { fill: #ffffff; }
+.dtp-face-bg { fill: var(--gray-50); stroke: none; }
+.dtp-tick { stroke: var(--gray-300); stroke-width: 0.8; stroke-linecap: round; }
+.dtp-tick.major { stroke: var(--gray-400); stroke-width: 1.2; }
+.dtp-hand { stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; }
+.dtp-knob { fill: var(--accent); }
+.dtp-hub { fill: var(--accent); }
+.dtp-hub-center { fill: var(--surface); }
 .dtp-nums { animation: dtp-fade 0.2s ease-out; }
 @keyframes dtp-fade { from { opacity: 0; } to { opacity: 1; } }
 .dtp-num {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
-  font-size: 16px;
-  font-weight: 400;
-  fill: #1c1c1e;
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  fill: var(--text);
   pointer-events: none;
 }
-.dtp-num.active { fill: #ffffff; font-weight: 500; }
+.dtp-num.active { fill: var(--gray-0); font-weight: var(--weight-semibold); }
 @media (prefers-reduced-motion: reduce) { .dtp-nums { animation: none; } }
 .dtp-done {
   align-self: flex-end;
   border: 0;
+  border-radius: var(--radius-full);
   background: transparent;
-  color: #c96200;
-  font-weight: bold;
-  font-size: 14px;
-  padding: 4px 8px;
+  color: var(--accent-text);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-md);
+  padding: var(--space-2) var(--space-3);
 }
 
-.button.estimate-button {
-  width: 100%;
-  height: 44px;
-  background-color: #FF8000;
-  border-color: #FF8000;
-  color: #ffffff;
-}
-.button.estimate-button:hover:not(:disabled) { border-color: #e06f00; background-color: #e06f00; }
-.button.estimate-button:active:not(:disabled) { background-color: #c96200; }
-.button.estimate-button:disabled {
-  background-color: #f3c08f;
-  border-color: #f3c08f;
-  color: #ffffff;
-  cursor: not-allowed;
-}
-.route-result {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px;
-  font-weight: normal;
-}
-.route-price {
-  font-size: 30px;
-  font-weight: bold;
-  line-height: 1.2;
-}
-.route-meta { font-size: 14px; color: #333333; }
-.route-breakdown,
-.route-disclaimer { font-size: 12px; color: #777777; }
-.route-note {
-  font-size: 13px;
-  font-weight: normal;
-  color: #7a4100;
-  background-color: #fff3e6;
-  border-radius: 10px;
-  padding: 8px 10px;
-}
-.distance-pill {
-  background: #000000;
-  color: #ffffff;
-  padding: 6px 12px;
-  border-radius: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  white-space: nowrap;
-  font-weight: bold;
-  font-size: 14px;
-}
-.stop-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 4px solid #1a73e8;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-.route-warning,
-.route-error {
-  font-size: 13px;
-  font-weight: normal;
-  color: #b3261e;
-  background-color: #fdecea;
-  border-radius: 10px;
-  padding: 8px 10px;
-}
-
+/* ---------- primary button ---------- */
 .button {
   -webkit-appearance: none;
   appearance: none;
   color-scheme: light;
-  background-color: #f9f9f9;
-  color: #000000;
-  border: 1px solid #d0d0d0;
+  border: 0;
   font: inherit;
-  font-weight: bold;
   cursor: pointer;
-  border-radius: 20px;
-  height: 40px;
-  width: 100px;
-  padding: 5px;
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+.button.estimate-button {
+  width: 100%;
+  height: 56px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-full);
+  background-color: var(--accent);
+  color: var(--gray-0);
+  font-size: 17px;
+  font-weight: var(--weight-semibold);
 }
 @media (hover: hover) {
-  .button:hover { border-color: #FF8000; }
+  .button.estimate-button:hover:not(:disabled) { background-color: var(--accent-hover); }
 }
-.button:active {
-  background-color: #ececec;
+.button.estimate-button:active:not(:disabled) { background-color: var(--accent-pressed); }
+.button.estimate-button:disabled {
+  background-color: var(--gray-200);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
 }
-.settings-block {
-  background-color: white;
+
+/* ---------- estimate result ---------- */
+.receipt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-1);
+  padding: var(--space-5);
+  background-color: var(--surface);
+  border-radius: var(--radius-lg);
 }
-.icon {
-  color: black;
-  size: 4;
+.receipt-head { display: flex; flex-direction: column; gap: 2px; }
+.receipt-label {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
 }
-.mapboxgl-ctrl-geocoder--input { 
-  font-size: 16px; 
-  padding-left: 16px;   /* search icon is hidden, so no room needed for it */
-  padding-right: 40px;  /* room for the clear (x) button */
+.route-price {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
-.mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--icon-search {
-  display: none !important;
+.route-meta {
+  margin-top: 2px;
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.receipt-trip {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+.receipt-trip li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* connector between the two stops */
+.receipt-trip::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 17px;
+  height: calc(100% - 34px);
+  border-left: 2px dotted var(--gray-300);
+}
+.trip-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.trip-dot.pickup { border: 3px solid var(--text); }
+.trip-dot.dropoff { background-color: var(--accent); border-radius: 3px; }
+.receipt-breakdown {
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+}
+.receipt-breakdown div { display: flex; justify-content: space-between; gap: var(--space-4); }
+.receipt-breakdown dt { color: var(--text-secondary); }
+.receipt-breakdown dd { margin: 0; color: var(--text); font-weight: var(--weight-medium); }
+.route-disclaimer {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.route-note,
+.route-warning,
+.route-error {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.route-note { color: var(--warning-text); background-color: var(--warning-soft); }
+.route-warning,
+.route-error { color: var(--danger-text); background-color: var(--danger-soft); }
+
+/* ---------- city list ---------- */
+.city-list { margin-top: var(--space-3); }
+.section-title {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+.city-list ul { list-style: none; margin: 0; padding: 0; }
+.city-row {
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-3) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease);
+}
+@media (hover: hover) {
+  .city-row:hover { background-color: var(--gray-200); }
+}
+.city-row:active { background-color: var(--gray-300); }
+.city-icon { flex: none; color: var(--text); }
+.city-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.city-name { font-size: 17px; font-weight: var(--weight-semibold); line-height: 1.3; }
+.city-meta { font-size: var(--text-md); color: var(--text-secondary); }
+.city-size {
+  flex: none;
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.skeleton {
+  display: inline-block;
+  width: 64px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--gray-200), var(--gray-300), var(--gray-200));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.panel-footer {
+  padding: var(--space-2) var(--space-2) 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* ---------- map markers + controls ---------- */
+.distance-pill {
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stop-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 4px solid var(--text);
+  box-shadow: var(--shadow-sm);
+}
+/* round white map buttons, like the app's back / layers buttons */
+.mapboxgl-ctrl-group:not(:empty) {
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.mapboxgl-ctrl-group button {
+  width: 44px;
+  height: 44px;
 }
 
 /* message from the locate button (e.g. how to unblock location), above the map controls */
@@ -552,36 +717,41 @@
   position: fixed;
   left: calc(12px + env(safe-area-inset-left));
   right: calc(12px + env(safe-area-inset-right));
-  bottom: calc(64px + env(safe-area-inset-bottom));
+  bottom: calc(72px + env(safe-area-inset-bottom));
   max-width: 440px;
   margin: 0 auto;
   z-index: 3;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 12px 8px 12px 14px;
-  background-color: #ffffff;
-  color: #1c1c1e;
-  border-radius: 14px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  font-size: 14px;
-  line-height: 1.4;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3) var(--space-4) var(--space-5);
+  background-color: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-md);
+  line-height: 1.45;
 }
 .location-toast span { flex: 1; }
 .location-toast button {
   -webkit-appearance: none;
   appearance: none;
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 32px;
   height: 32px;
-  margin: -6px 0;
+  margin: -4px 0;
+  padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: transparent;
-  color: #555555;
-  font-size: 22px;
-  line-height: 1;
+  color: var(--text-secondary);
   cursor: pointer;
+}
+@media (hover: hover) {
+  .location-toast button:hover { background-color: var(--gray-100); }
 }
 
 /* mobile sheet controls + in-card city chips: hidden on desktop */
@@ -589,22 +759,14 @@
 .sheet-summary,
 .city-chips { display: none; }
 
-/* RESPONSIVE BREAKPOINTS - for different size devices */
+/* ---------- RESPONSIVE ---------- */
 
-/* Tablets */
+/* Tablets and phones: the panel becomes a sheet across the top */
 @media (max-width: 768px) {
-  .overlap {
-    width: min(350px, calc(100vw - 24px));  /* never wider than screen */
-    height: auto;
-    max-height: calc(100dvh - 96px);
-    
-  }
-
   /* no grey flash on tap; :active styles give the feedback instead */
   .search-card button,
   .button { -webkit-tap-highlight-color: transparent; }
 
-  /* search box: full-width strip at the top, clear of the notch */
   .search-card {
     top: calc(12px + env(safe-area-inset-top));
     left: calc(12px + env(safe-area-inset-left));
@@ -614,10 +776,10 @@
     margin: 0 auto;
     /* tall content (e.g. the open calendar) scrolls instead of running off screen */
     max-height: calc(100dvh - 120px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-bottom: 0;
-    transition: transform 0.25s ease;
+    padding: var(--space-3) var(--space-3) 0;
+    gap: var(--space-2);
+    border-radius: var(--radius-lg);
+    transition: transform 0.25s var(--ease);
   }
 
   /* collapsed: only the essentials stay (search box, or a one-line trip summary) */
@@ -625,36 +787,30 @@
   .search-card.collapsed .city-chips,
   .search-card.collapsed .route-panel { display: none !important; }
 
-  /* 44px touch targets (Apple HIG / Material minimum) */
-  .mode-tab { min-height: 40px; font-size: 15px; }
-  .dtp-chip { min-height: 44px; }
-  .dtp-now { min-height: 44px; padding: 0 14px; }
-  .dtp-nav { width: 44px; height: 44px; }
-  .dtp-segmented button { min-height: 36px; padding: 6px 14px; font-size: 14px; }
-  .dtp-done { min-height: 44px; padding: 0 16px; font-size: 15px; }
-  .dtp-digit { min-height: 48px; }
-  .button.estimate-button { height: 48px; font-size: 16px; }
+  /* the sheet keeps only the controls; the city chips stand in for the city list */
+  .panel-header,
+  .city-list,
+  .panel-footer { display: none; }
 
-  /* the card scrolls, so an absolutely-positioned suggestion list gets clipped inside it;
-     put the list in normal flow so it pushes content down and scrolls with the card */
-  .search-card .mapboxgl-ctrl-geocoder .suggestions {
-    position: static;
-    margin-top: 4px;
-    box-shadow: none;
-    border: 1px solid #ececec;
-  }
+  /* 44px touch targets (Apple HIG / Material minimum) */
+  .dtp-nav { width: 44px; height: 44px; }
+  .dtp-segmented button { min-height: 36px; padding: 6px 14px; }
+  .dtp-done { min-height: 44px; }
+  .dtp-digit { min-height: 48px; }
+  .receipt { padding: var(--space-4); }
+  .route-price { font-size: var(--text-xl); }
+
   .search-card .mapboxgl-ctrl-geocoder .suggestions > li > a {
-    padding: 12px 14px;           /* roomy enough to tap the right row */
+    padding: 12px var(--space-4);   /* roomy enough to tap the right row */
   }
   .search-card .mapboxgl-ctrl-geocoder--button {
-    min-width: 44px;              /* clear (x) button */
+    min-width: 44px;                /* clear (x) button */
   }
 
-  /* city shortcuts: a chip row inside the card */
-  /* one row that scrolls sideways once there are more cities than fit */
+  /* city shortcuts: outlined pill chips that scroll sideways when they overflow */
   .city-chips {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
@@ -664,32 +820,23 @@
     -webkit-appearance: none;
     appearance: none;
     flex: 1 0 auto;
-    min-height: 40px;
-    padding: 0 12px;
-    border: 1px solid #e0e0e0;
-    border-radius: 20px;
-    background-color: #ffffff;
-    color: #000000;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-full);
+    background-color: transparent;
+    color: var(--text);
     font: inherit;
-    font-size: 14px;
-    font-weight: bold;
+    font-size: var(--text-md);
+    font-weight: var(--weight-medium);
     white-space: nowrap;
     cursor: pointer;
   }
-  .city-chip:active { background-color: #fff3e6; border-color: #FF8000; }
-
-  /* floating title + city cards would collide with the locate button and the Mapbox
-     attribution along the bottom edge; the card's chips replace them */
-  .title-card,
-  .locations-card { display: none; }
+  .city-chip:active { background-color: var(--gray-200); }
 
   /* keep the map's own controls above the home indicator */
   .mapboxgl-ctrl-bottom-left,
   .mapboxgl-ctrl-bottom-right { margin-bottom: env(safe-area-inset-bottom); }
-  .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-geolocate {
-    width: 44px;
-    height: 44px;
-  }
 
   .sheet-grabber {
     -webkit-appearance: none;
@@ -700,7 +847,6 @@
     flex: none;
     width: 100%;
     height: 22px;
-    margin-top: -4px;
     padding: 0;
     border: 0;
     background: transparent;
@@ -708,10 +854,10 @@
     touch-action: none;
   }
   .sheet-grabber span {
-    width: 40px;
+    width: 36px;
     height: 5px;
-    border-radius: 3px;
-    background-color: #cfcfcf;
+    border-radius: var(--radius-full);
+    background-color: var(--gray-300);
   }
 
   .sheet-summary {
@@ -720,14 +866,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
     width: 100%;
-    min-height: 44px;
-    padding: 6px 8px;
+    min-height: 52px;
+    padding: 0 var(--space-4);
     border: 0;
-    border-radius: 10px;
-    background: transparent;
-    color: #000000;
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    color: var(--text);
     font: inherit;
     text-align: left;
     cursor: pointer;
@@ -737,21 +883,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 14px;
-    font-weight: normal;
-    color: #333333;
+    font-size: var(--text-md);
+    font-weight: var(--weight-medium);
+    color: var(--text);
   }
   .sheet-summary-price {
     flex: none;
-    font-size: 18px;
-    font-weight: bold;
-    color: #c96200;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-text);
   }
-
 }
 
 /* Phones */
-
 @media (max-width: 480px) {
   .search-card {
     top: calc(8px + env(safe-area-inset-top));
@@ -759,5 +904,3 @@
     right: calc(8px + env(safe-area-inset-right));
   }
 }
-
-

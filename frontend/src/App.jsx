@@ -6,10 +6,42 @@ import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 
 import './App.css'
 import DateTimePicker from './DateTimePicker.jsx'
-import { prepareAreas, snapTrip, checkRoute } from './geo.js'
+import { prepareAreas, snapTrip, checkRoute, areaSqMiles } from './geo.js'
 import LocateControl, { getPosition, locationErrorMessage } from './locate.js'
+import { XMarkIcon } from '@heroicons/react/20/solid'
+import { MapPinIcon } from '@heroicons/react/24/outline'
+
+// `name` must match the `city` field of the service area in the database
+const CITIES = [
+  { name: 'Los Angeles',       short: 'LA',        state: 'CA', center: [-118.25, 34.05],   zoom: 10 },
+  { name: 'San Francisco Bay', short: 'SF Bay',    state: 'CA', center: [-122.25, 37.67],   zoom: 9 },
+  { name: 'Phoenix',           short: 'Phoenix',   state: 'AZ', center: [-112.074, 33.4484], zoom: 10 },
+  { name: 'San Diego',         short: 'San Diego', state: 'CA', center: [-117.19, 32.79],   zoom: 10.5 },
+  { name: 'Dallas',            short: 'Dallas',    state: 'TX', center: [-96.80, 32.81],    zoom: 10.5 },
+];
+
+// Waymo-app style: dim everything outside the service areas, white outline around them
+const STATE_NAMES = { AZ: 'Arizona', CA: 'California', TX: 'Texas' };
+
+const AREA_STYLE = {
+  maskColor: '#0e1621', maskOpacity: 0.16,
+  fillOpacity: 0, fillOpacityHover: 0.08,
+  lineColor: '#ffffff', lineColorHover: '#00c2a8',
+  lineWidth: 3, lineWidthHover: 3.5,
+};
 
 const CURRENT_LOCATION_LABEL = "Current location";
+
+// Mapbox paints in JS, so it can't read CSS variables; keep these in sync with index.css
+const COLORS = {
+  accent: '#007d6e',       // --accent
+  accentBright: '#00c2a8', // --accent-bright
+  ink: '#0e1621',          // --text
+  muted: '#5b6472',        // --text-secondary
+  route: '#007d6e',        // --accent
+  pickup: '#0e1621',       // --text
+  dropoff: '#007d6e',      // --accent
+};
 
 function LocationArrowIcon() {
   return (
@@ -20,7 +52,6 @@ function LocationArrowIcon() {
 }
 const API_KEY = import.meta.env.VITE_APP_MAPBOX_API_KEY;
 const API_URL = import.meta.env.VITE_APP_API_URL || "";
-import { Field, Fieldset, Input, Label, Legend, Select, Textarea, Button, Tab, TabGroup, TabList,Menu, MenuButton, MenuItem, MenuItems} from '@headlessui/react'
 
 // Render's free plan spins the backend down after inactivity; the first request
 // triggers a cold start that can take 30-60s. Poll /health until it answers 200.
@@ -80,6 +111,7 @@ function App() {
   const [pickupLabel, setPickupLabel] = useState("");
   const [dropoffLabel, setDropoffLabel] = useState("");
   const [locatingFor, setLocatingFor] = useState(null); // "pickup" | "dropoff" | null
+  const [areaSizes, setAreaSizes] = useState({}); // city name -> square miles
 
   // fill the pickup or dropoff box with the device's location
   async function pickCurrentLocation(which) {
@@ -172,6 +204,21 @@ function App() {
     }
   }
 
+  // desktop: the side panel covers the left of the map, so shift camera targets right
+  // by half its width (plus the gap) to center them in the visible part
+  function panelInset() {
+    if (isNarrowScreen() || !sheetRef.current) return 0;
+    return sheetRef.current.offsetLeft + sheetRef.current.offsetWidth;
+  }
+
+  function setAreaHighlight(city, on) {
+    const map = mapRef.current;
+    if (!map?.getLayer('fill-' + city)) return;
+    map.setPaintProperty('fill-' + city, 'fill-opacity', on ? AREA_STYLE.fillOpacityHover : AREA_STYLE.fillOpacity);
+    map.setPaintProperty('outline-' + city, 'line-width', on ? AREA_STYLE.lineWidthHover : AREA_STYLE.lineWidth);
+    map.setPaintProperty('outline-' + city, 'line-color', on ? AREA_STYLE.lineColorHover : AREA_STYLE.lineColor);
+  }
+
   async function getAreas() {
     if (!areasRef.current) {
       const res = await fetch(`${API_URL}/api/service-areas`);
@@ -202,7 +249,7 @@ function App() {
     routeMarkersRef.current.forEach((m) => m.remove());
     routeMarkersRef.current = [];
     const map = mapRef.current;
-    for (const id of ['route-line', 'route-gaps-line']) {
+    for (const id of ['route-line', 'route-casing', 'route-gaps-line']) {
       if (map?.getLayer(id)) map.removeLayer(id);
     }
     for (const id of ['route', 'route-gaps']) {
@@ -313,12 +360,20 @@ function App() {
       type: 'geojson',
       data: { type: 'Feature', properties: {}, geometry: route.geometry },
     });
+    // white casing under the line keeps it readable over the shaded service areas
+    map.addLayer({
+      id: 'route-casing',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-emissive-strength': 1 },
+    });
     map.addLayer({
       id: 'route-line',
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#1a73e8', 'line-width': 6, 'line-emissive-strength': 1 },
+      paint: { 'line-color': COLORS.route, 'line-width': 5, 'line-emissive-strength': 1 },
     });
 
     const gaps = [ends.pickup, ends.dropoff].filter((e) => !e.inArea);
@@ -338,12 +393,12 @@ function App() {
       type: 'line',
       source: 'route-gaps',
       layout: { 'line-cap': 'round' },
-      paint: { 'line-color': 'orange', 'line-width': 5, 'line-dasharray': [0.5, 2], 'line-emissive-strength': 1 },
+      paint: { 'line-color': COLORS.muted, 'line-width': 4, 'line-dasharray': [0.5, 2], 'line-emissive-strength': 1 },
     });
 
     const markers = [
-      new mapboxgl.Marker({ color: '#2e7d32' }).setLngLat(ends.pickup.original).addTo(map),
-      new mapboxgl.Marker({ color: '#c62828' }).setLngLat(ends.dropoff.original).addTo(map),
+      new mapboxgl.Marker({ color: COLORS.pickup }).setLngLat(ends.pickup.original).addTo(map),
+      new mapboxgl.Marker({ color: COLORS.dropoff }).setLngLat(ends.dropoff.original).addTo(map),
     ];
     for (const e of gaps) {
       const mid = [(e.original[0] + e.point[0]) / 2, (e.original[1] + e.point[1]) / 2];
@@ -360,7 +415,7 @@ function App() {
       // on mobile the sheet collapses to a one-line summary once the route is drawn
       padding: isNarrow
         ? { top: 130, bottom: 80, left: 40, right: 40 }
-        : { top: 80, bottom: 80, left: 420, right: 420 },
+        : { top: 80, bottom: 80, left: panelInset() + 60, right: 80 },
       maxZoom: 15,
     });
   }
@@ -402,16 +457,13 @@ function App() {
       body: JSON.stringify({long: long, lat: lat}),
 
     });
-    const data = await res.json();
-    console.log ("Inside function:")
-    console.log(data);
-    return data;
+    return res.json();
   }
   async function placeMarker(e) {
     if (currentMarkerRef.current) {
       currentMarkerRef.current.remove();
     }
-    var marker = new mapboxgl.Marker().
+    var marker = new mapboxgl.Marker({ color: COLORS.ink }).
         setLngLat(e.result.center)
         marker._element.id = "selection";
         marker.addTo(mapRef.current);
@@ -430,22 +482,8 @@ function App() {
     });
     const data = await res.json();
 
-    const el = document.createElement("div");
-    el.innerHTML = `
-      <div style="
-        background: black;
-        color: white;
-        padding: 8px 14px;
-        border-radius: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        white-space: nowrap;
-      ">
-        <strong>${data.distance.toFixed(2)} mi</strong>
-      </div>
-    `;
-
     var popup = new mapboxgl.Marker({
-      element: el,
+      element: distancePill(data.distance),
       anchor: "center"
     })
   .setLngLat(data.midpoint.geometry.coordinates)
@@ -463,7 +501,6 @@ function App() {
     });
     
     const data = await res.json();
-    console.log(data["closest-point"].geometry.coordinates);
     if (mapRef.current.getSource('closest-point-route')) {
       mapRef.current.removeLayer('line-dashed');
       mapRef.current.removeSource('closest-point-route');
@@ -491,8 +528,8 @@ function App() {
       source: 'closest-point-route',
       id: 'line-dashed',
       paint: {
-        'line-color': 'orange',
-        'line-width': 6,
+        'line-color': COLORS.muted,
+        'line-width': 5,
         'line-dasharray': [0, 4, 3],
         'line-emissive-strength': 1
       }
@@ -537,37 +574,12 @@ function App() {
     animateDashArray(0);
 
   }
-  async function viewLocation(location) {
-    if (location == "LA") {
-      mapRef.current.flyTo({
-        center: [-118.25, 34.05],
-        zoom: 10
-      })
-    }
-    if (location == "SF") {
-      mapRef.current.flyTo({
-        center: [-122.25, 37.67],
-        zoom: 9
-      })
-    }
-    if (location == "Phoenix") {
-      mapRef.current.flyTo({
-        center: [-112.0740, 33.4484],
-        zoom: 10
-      })
-    }
-    if (location == "SD") {
-      mapRef.current.flyTo({
-        center: [-117.19, 32.79],
-        zoom: 10.5
-      })
-    }
-    if (location == "Dallas") {
-      mapRef.current.flyTo({
-        center: [-96.80, 32.81],
-        zoom: 10.5
-      })
-    }
+  function viewLocation(city) {
+    mapRef.current.flyTo({
+      center: city.center,
+      zoom: city.zoom,
+      offset: [panelInset() / 2, 0],
+    });
   }
 
   useEffect(() => {
@@ -581,7 +593,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    document.title = "Waymo Service Areas";
+    document.title = "Waymo Trip Calculator";
     mapboxgl.accessToken = API_KEY;
     
 
@@ -594,50 +606,73 @@ function App() {
 
 
     mapRef.current.on('load', async () => {
-      console.log(API_URL);
-
       // backend may still be cold-starting when the map finishes loading
       await waitForBackend();
       const res = await fetch(`${API_URL}/api/service-areas`);
 
       const data = await res.json();
       areasRef.current = prepareAreas(data.serviceAreas);
+      setAreaSizes(Object.fromEntries(
+        data.serviceAreas.map((a) => [a.city, areaSqMiles(a.coordinates)])
+      ));
 
+      const map = mapRef.current;
 
-      // Add a data source containing GeoJSON data.
-      for (let i = 0; i < data.serviceAreas.length; i++) {
-        mapRef.current.addSource(data.serviceAreas[i].city, {
-            'type': 'geojson',
-            'data': {
-                'type': 'Feature',
-                'geometry': {
-                    'type': 'Polygon',
-                    'coordinates': [data.serviceAreas[i].coordinates]
-                }
-            }
+      // one world-sized polygon with every service area cut out as a hole
+      map.addSource('outside-mask', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]],
+              ...data.serviceAreas.map((a) => a.coordinates),
+            ],
+          },
+        },
       });
-      mapRef.current.addLayer({
-        'id': 'fill-' + data.serviceAreas[i].city,
-        'type': 'fill',
-        'source': data.serviceAreas[i].city, 
-        'paint': {
-            'fill-color': '#FF8000', 
-            'fill-opacity': 0.4
-        }
-    });  
-      mapRef.current.addLayer({
-        'id': 'outline-' + data.serviceAreas[i].city,
-        'type': 'line',
-        'source': data.serviceAreas[i].city, 
-        'layout': {},
-        'paint': {
-          'line-color': '#FF8000',
-          'line-width': 3
-        }
+      map.addLayer({
+        id: 'outside-mask',
+        type: 'fill',
+        source: 'outside-mask',
+        paint: { 'fill-color': AREA_STYLE.maskColor, 'fill-opacity': AREA_STYLE.maskOpacity },
       });
-      
 
-    }
+      for (const area of data.serviceAreas) {
+        map.addSource(area.city, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: { type: 'Polygon', coordinates: [area.coordinates] },
+          },
+        });
+        map.addLayer({
+          id: 'fill-' + area.city,
+          type: 'fill',
+          source: area.city,
+          paint: {
+            'fill-color': COLORS.accentBright,
+            'fill-opacity': AREA_STYLE.fillOpacity,
+            'fill-opacity-transition': { duration: 150 },
+          },
+        });
+        map.addLayer({
+          id: 'outline-' + area.city,
+          type: 'line',
+          source: area.city,
+          layout: { 'line-join': 'round' },
+          paint: {
+            'line-color': AREA_STYLE.lineColor,
+            'line-width': AREA_STYLE.lineWidth,
+            'line-width-transition': { duration: 150 },
+            'line-color-transition': { duration: 150 },
+            'line-emissive-strength': 1,
+          },
+        });
+        map.on('mouseenter', 'fill-' + area.city, () => setAreaHighlight(area.city, true));
+        map.on('mouseleave', 'fill-' + area.city, () => setAreaHighlight(area.city, false));
+      }
     }
   );
 
@@ -648,6 +683,7 @@ function App() {
           accessToken: mapboxgl.accessToken,
           useBrowserFocus: true,
           mapboxgl: mapboxgl,
+          placeholder: 'Search an address',
       });
       geocoderRef.current.addTo(geocoderContainerRef.current);
 
@@ -679,9 +715,9 @@ function App() {
         g.on('clear', () => { onPick(null, ""); setEstimate(null); });
         return g;
       };
-      pickupGeocoderRef.current = makeRouteGeocoder('Pickup address', pickupContainerRef.current,
+      pickupGeocoderRef.current = makeRouteGeocoder('Pickup location', pickupContainerRef.current,
         (c, label) => { setPickup(c); setPickupLabel(label); });
-      dropoffGeocoderRef.current = makeRouteGeocoder('Dropoff address', dropoffContainerRef.current,
+      dropoffGeocoderRef.current = makeRouteGeocoder('Where to?', dropoffContainerRef.current,
         (c, label) => { setDropoff(c); setDropoffLabel(label); });
 
       // panning the map on a phone tucks the sheet away, like most map apps
@@ -702,7 +738,7 @@ function App() {
           center: e.result.center,
           zoom: 14,
           // on a phone the search card covers the top of the map; center the pin in what's left
-          offset: narrow ? [0, (sheetRef.current?.offsetHeight || 0) / 2] : [0, 0],
+          offset: narrow ? [0, (sheetRef.current?.offsetHeight || 0) / 2] : [panelInset() / 2, 0],
       });
       if (mapRef.current.getSource('closest-point-route')) {
         mapRef.current.removeLayer('line-dashed');
@@ -736,27 +772,19 @@ function App() {
       mapRef.current.remove()
     }
   }, [])
-  return (
-    
-    
-    <div style={
-      {
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100dvh',
-        maxWidth: '100%',
-        position: 'relative'
+  const cityList = CITIES.map((city) => ({ ...city, sqmi: areaSizes[city.name] }));
 
-      }
-    }>
+  return (
+    <div className="app">
 
       {!backendReady && (
-        <div className="loading-screen">
-          <div className="loading-spinner" />
+        <div className="loading-screen" role="status" aria-live="polite">
+          <h1 className="loading-title">Waymo Trip Calculator</h1>
+          <div className="loading-bar"><span /></div>
           <div className="loading-text">
             {backendTimedOut
-              ? "Server is taking longer than usual… hang tight or refresh."
-              : "Waking up the server… est. 15 sec"}
+              ? "This is taking longer than usual. Hang tight, or try refreshing."
+              : "Loading service areas…"}
           </div>
         </div>
       )}
@@ -764,45 +792,28 @@ function App() {
       {locationMessage && (
         <div className="location-toast" role="alert">
           <span>{locationMessage}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setLocationMessage(null)}>×</button>
+          <button type="button" aria-label="Dismiss" onClick={() => setLocationMessage(null)}>
+            <XMarkIcon width={18} height={18} aria-hidden="true" />
+          </button>
         </div>
       )}
 
-      <div className='map-container' ref={mapContainerRef}>
+      <div className="map-container" ref={mapContainerRef} />
 
-            <Fieldset className="overlap title-card">
-              <Legend className="text-block">Waymo Service Areas</Legend>
-              <Label className={"text-block small-text-block"}>an interactive map.</Label>
-              <Field>
-                
-              </Field>
-            </Fieldset>
-
-            
-      </div>
-
-      <Fieldset >
-
-          <Field className="overlap locations-card">
-
-                <Button className="button" onClick={() => viewLocation("LA")}>LA</Button>
-                <Button className="button" onClick={() => viewLocation("SF")}>SF</Button>
-                <Button className="button" onClick={() => viewLocation("Phoenix")}>AZ</Button>
-                <Button className="button" onClick={() => viewLocation("SD")}>SD</Button>
-                <Button className="button" onClick={() => viewLocation("Dallas")}>DAL</Button>
-          </Field>
-          
-          
-        </Fieldset>
-      
-      <Fieldset
+      <aside
         ref={sheetRef}
-        className={`overlap search-card${sheetOpen ? "" : " collapsed"}`}
+        className={`panel search-card${sheetOpen ? "" : " collapsed"}`}
+        aria-label="Search and fare estimates"
         onTouchStart={onSheetTouchStart}
         onTouchMove={onSheetTouchMove}
         onTouchEnd={onSheetTouchEnd}
         onTouchCancel={onSheetTouchEnd}
       >
+        <header className="panel-header">
+          <h1 className="brand-title">Waymo Trip Calculator</h1>
+          <p className="brand-tagline">Check coverage and estimate a fare.</p>
+        </header>
+
         {mode === "route" && !sheetOpen && (
           <button type="button" className="sheet-summary" onClick={() => setSheetOpen(true)}>
             <span className="sheet-summary-route">
@@ -815,6 +826,7 @@ function App() {
             </span>
           </button>
         )}
+
         <div className="mode-toggle" role="tablist" aria-label="Mode">
           <button
             type="button"
@@ -836,24 +848,24 @@ function App() {
           </button>
         </div>
 
-        <div className='geocoder-container' ref={geocoderContainerRef} hidden={mode !== "search"}></div>
+        <div className="geocoder-container" ref={geocoderContainerRef} hidden={mode !== "search"}></div>
 
-        {/* mobile only: city shortcuts live in the card instead of floating over the map */}
+        {/* mobile only: compact city shortcuts */}
         <div className="city-chips" hidden={mode !== "search"}>
-          <button type="button" className="city-chip" onClick={() => viewLocation("LA")}>LA</button>
-          <button type="button" className="city-chip" onClick={() => viewLocation("SF")}>SF Bay</button>
-          <button type="button" className="city-chip" onClick={() => viewLocation("Phoenix")}>Phoenix</button>
-          <button type="button" className="city-chip" onClick={() => viewLocation("SD")}>San Diego</button>
-          <button type="button" className="city-chip" onClick={() => viewLocation("Dallas")}>Dallas</button>
+          {CITIES.map((city) => (
+            <button key={city.name} type="button" className="city-chip" onClick={() => viewLocation(city)}>
+              {city.short}
+            </button>
+          ))}
         </div>
 
         <div className="route-panel" hidden={mode !== "route"}>
-          <div className="route-field">
-            <div className='geocoder-container route-geocoder' ref={pickupContainerRef}></div>
+          <div className="route-field pickup">
+            <div className="geocoder-container route-geocoder" ref={pickupContainerRef}></div>
             {currentLocationButton("pickup")}
           </div>
-          <div className="route-field">
-            <div className='geocoder-container route-geocoder' ref={dropoffContainerRef}></div>
+          <div className="route-field dropoff">
+            <div className="geocoder-container route-geocoder" ref={dropoffContainerRef}></div>
             {currentLocationButton("dropoff")}
           </div>
 
@@ -874,7 +886,7 @@ function App() {
           {estimateError && <div className="route-error">{estimateError}</div>}
 
           {estimate && (
-            <div className="route-result">
+            <div className="receipt">
               {estimate.ends.pickup.inArea === false && (
                 <div className="route-note">
                   Pickup is outside the service area. Nearest Waymo pickup is {estimate.ends.pickup.gapMiles.toFixed(2)} mi away (dashed line).
@@ -890,21 +902,66 @@ function App() {
                   Couldn&apos;t find a route that stays fully inside the service area. The route shown leaves it briefly.
                 </div>
               )}
-              <div className="route-price">
-                ${estimate.low.toFixed(0)}–${estimate.high.toFixed(0)}
+
+              <div className="receipt-head">
+                <div className="receipt-label">Estimated fare</div>
+                <div className="route-price">
+                  ${estimate.low.toFixed(0)}–${estimate.high.toFixed(0)}
+                </div>
+                <div className="route-meta">
+                  {estimate.distanceMiles.toFixed(1)} mi · {Math.round(estimate.durationMinutes)} min
+                  {" · "}{estimate.timeLabel}{estimate.multiplier !== 1 ? ` (×${estimate.multiplier})` : ""}
+                </div>
               </div>
-              <div className="route-meta">
-                {estimate.distanceMiles.toFixed(1)} mi · {Math.round(estimate.durationMinutes)} min
-                {" · "}{estimate.timeLabel}{estimate.multiplier !== 1 ? ` (×${estimate.multiplier})` : ""}
-              </div>
-              <div className="route-breakdown">
-                Base ${estimate.breakdown.base.toFixed(2)} · Distance ${estimate.breakdown.distance.toFixed(2)}
-                {" · "}Time ${estimate.breakdown.time.toFixed(2)} · Booking ${estimate.breakdown.bookingFee.toFixed(2)}
-              </div>
-              <div className="route-disclaimer">Unofficial estimate, not Waymo pricing.</div>
+
+              <ol className="receipt-trip">
+                <li><span className="trip-dot pickup" />{pickupLabel || "Pickup"}</li>
+                <li><span className="trip-dot dropoff" />{dropoffLabel || "Dropoff"}</li>
+              </ol>
+
+              <dl className="receipt-breakdown">
+                <div><dt>Base fare</dt><dd>${estimate.breakdown.base.toFixed(2)}</dd></div>
+                <div><dt>Distance</dt><dd>${estimate.breakdown.distance.toFixed(2)}</dd></div>
+                <div><dt>Time</dt><dd>${estimate.breakdown.time.toFixed(2)}</dd></div>
+                <div><dt>Booking fee</dt><dd>${estimate.breakdown.bookingFee.toFixed(2)}</dd></div>
+              </dl>
+
+              <p className="route-disclaimer">Unofficial estimate, not Waymo pricing.</p>
             </div>
           )}
         </div>
+
+        <section className="city-list" aria-labelledby="city-list-title">
+          <h2 className="section-title" id="city-list-title">Service areas</h2>
+          <ul>
+            {cityList.map((city) => (
+              <li key={city.name}>
+                <button
+                  type="button"
+                  className="city-row"
+                  onClick={() => viewLocation(city)}
+                  onMouseEnter={() => setAreaHighlight(city.name, true)}
+                  onMouseLeave={() => setAreaHighlight(city.name, false)}
+                  onFocus={() => setAreaHighlight(city.name, true)}
+                  onBlur={() => setAreaHighlight(city.name, false)}
+                >
+                  <MapPinIcon className="city-icon" width={26} height={26} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="city-text">
+                    <span className="city-name">{city.name}</span>
+                    <span className="city-meta">{STATE_NAMES[city.state]}</span>
+                  </span>
+                  <span className="city-size">
+                    {city.sqmi ? `${Math.round(city.sqmi).toLocaleString()} sq mi` : <span className="skeleton" />}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <footer className="panel-footer">
+          Unofficial project. Not affiliated with Waymo.
+        </footer>
 
         <button
           type="button"
@@ -915,10 +972,8 @@ function App() {
         >
           <span />
         </button>
-      </Fieldset>
-    
+      </aside>
     </div>
-    
   );
 }
 
