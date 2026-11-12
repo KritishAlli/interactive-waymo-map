@@ -7,6 +7,9 @@ const mongoose = require("mongoose");
 
 // create the server app
 const app = express();
+// behind Render's proxy: take the client IP from X-Forwarded-For so per-IP rate limits
+// apply to each user rather than to the proxy
+app.set("trust proxy", 1);
 app.use(cors());
 //allow JSON (file type) in requests
 app.use(express.json());

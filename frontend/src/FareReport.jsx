@@ -10,7 +10,7 @@ const FUTURE_SLACK_MS = 5 * 60 * 1000; // a ride can't have happened later than 
 // time changes, so this resets on its own.
 export default function FareReport({ estimate, departAt }) {
   const [paid, setPaid] = useState("");
-  const [status, setStatus] = useState("idle"); // "idle" | "sending" | "sent" | "error"
+  const [status, setStatus] = useState("idle"); // "idle" | "sending" | "sent" | "error" | "limited"
   const [whenMode, setWhenMode] = useState("trip"); // "trip" = the departure above | "custom"
   const [customAt, setCustomAt] = useState(departAt);
 
@@ -20,7 +20,7 @@ export default function FareReport({ estimate, departAt }) {
   const validAmount = paid.trim() !== "" && Number.isFinite(amount) && amount >= 1 && amount <= 500;
   const canSubmit = validAmount && !isFuture && status !== "sending";
 
-  const clearError = () => { if (status === "error") setStatus("idle"); };
+  const clearError = () => { if (status === "error" || status === "limited") setStatus("idle"); };
 
   async function submit(e) {
     e.preventDefault();
@@ -39,6 +39,7 @@ export default function FareReport({ estimate, departAt }) {
           paid: amount,
         }),
       });
+      if (res.status === 429) { setStatus("limited"); return; }
       if (!res.ok) throw new Error("Request failed");
       setStatus("sent");
     } catch {
@@ -56,6 +57,7 @@ export default function FareReport({ estimate, departAt }) {
 
   let hint = "Anonymous; only used to improve estimates.";
   if (status === "error") hint = "Couldn't send that. Please try again.";
+  else if (status === "limited") hint = "You've sent a lot of fares recently. Please try again later.";
   else if (isFuture) hint = whenMode === "trip"
     ? "The trip time above is in the future. Pick when you actually rode."
     : "That time is in the future. Pick when you actually rode.";
@@ -111,8 +113,8 @@ export default function FareReport({ estimate, departAt }) {
         </button>
       </div>
       <p
-        className={`fare-report-hint${status === "error" || isFuture ? " error" : ""}`}
-        role={status === "error" ? "alert" : undefined}
+        className={`fare-report-hint${status === "error" || status === "limited" || isFuture ? " error" : ""}`}
+        role={status === "error" || status === "limited" ? "alert" : undefined}
       >
         {hint}
       </p>

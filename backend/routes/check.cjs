@@ -8,6 +8,7 @@ const router = express.Router();
 
 const { isPointInBound , getDistance, isPointInAnyBound, getClosestPolygonPoint, getMidpoint, getTwoPointDistance} = require("../services/logic.cjs");
 const FareReport = require('../models/FareReport.cjs');
+const { rateLimit } = require("express-rate-limit");
 const { estimateFare } = require("../services/pricing.cjs");
 // active service areas, cached in memory so pricing requests skip the MongoDB round trip
 const AREA_CACHE_MS = 5 * 60 * 1000;
@@ -93,9 +94,19 @@ router.post("/estimate-price", async (req, res) => {
   });
 })
 
+// limits fare reports per client IP to keep spam out of the dataset. Counts are held in
+// memory only (IPs are never stored with reports) and reset when the server restarts.
+const fareReportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 10,                // reports per IP per window
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Too many fare reports. Please try again later." },
+});
+
 // a user reports what they actually paid for an estimated trip. The estimate is recomputed
 // here (not taken from the client) so every report records what the model predicted.
-router.post("/fare-reports", async (req, res) => {
+router.post("/fare-reports", fareReportLimiter, async (req, res) => {
   const { pickup, dropoff, distanceMiles, durationMinutes, departAt, paid } = req.body;
   const validCoord = (c) => Array.isArray(c) && c.length === 2 && c.every(Number.isFinite);
   const when = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(typeof departAt === "string" ? departAt : "");
