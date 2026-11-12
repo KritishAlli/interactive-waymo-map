@@ -23,6 +23,8 @@
   flex: 1;
   width: 100%;
   min-height: 100dvh;
+  /* own stacking context: markers, the fare callout and popups stay under the panel */
+  isolation: isolate;
 }
 /* mapbox-gl sets its own font on the map; floating UI inside it should use ours */
 .mapboxgl-map { font-family: var(--font-sans); }
@@ -111,7 +113,7 @@
   100% { opacity: 1; scale: 1; }
 }
 
-/* ---------- panel (left sidebar on desktop, top sheet on mobile) ---------- */
+/* ---------- panel (left sidebar on desktop, bottom sheet on mobile) ---------- */
 .panel {
   /* keep native controls (buttons, geocoder input) in light mode */
   color-scheme: light;
@@ -139,7 +141,7 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
 }
-/* slides in from the left as the loading screen lifts (top on mobile, see below);
+/* slides in from the left as the loading screen lifts (bottom on mobile, see below);
    `translate` keeps the mobile drag's inline transform free */
 .panel.entered { animation: panel-in 0.7s var(--ease) 0.15s both; }
 @keyframes panel-in {
@@ -1010,14 +1012,15 @@
 
 /* ---------- RESPONSIVE ---------- */
 
-/* Tablets and phones: the panel becomes a sheet across the top */
+/* Tablets and phones: the panel becomes a sheet along the bottom */
 @media (max-width: 768px) {
   /* no grey flash on tap; :active styles give the feedback instead */
   .search-card button,
   .button { -webkit-tap-highlight-color: transparent; }
 
   .search-card {
-    top: calc(12px + env(safe-area-inset-top));
+    top: auto;
+    bottom: calc(12px + env(safe-area-inset-bottom));
     left: calc(12px + env(safe-area-inset-left));
     right: calc(12px + env(safe-area-inset-right));
     width: auto;
@@ -1083,9 +1086,21 @@
   }
   .city-chip:active { background-color: var(--gray-200); }
 
-  /* keep the map's own controls above the home indicator */
+  /* the sheet covers the bottom of the map, so the map's own controls move to the top */
   .mapboxgl-ctrl-bottom-left,
-  .mapboxgl-ctrl-bottom-right { margin-bottom: env(safe-area-inset-bottom); }
+  .mapboxgl-ctrl-bottom-right {
+    top: env(safe-area-inset-top);
+    bottom: auto;
+  }
+
+  /* the locate button moved up top, so its message drops down from there too */
+  .location-toast {
+    top: calc(64px + env(safe-area-inset-top));
+    bottom: auto;
+  }
+
+  /* bottom sheet: the grabber sits on the card's top edge */
+  .search-card .sheet-grabber { order: -1; }
 
   .sheet-grabber {
     -webkit-appearance: none;
@@ -1148,7 +1163,7 @@
 /* Phones */
 @media (max-width: 480px) {
   .search-card {
-    top: calc(8px + env(safe-area-inset-top));
+    bottom: calc(8px + env(safe-area-inset-bottom));
     left: calc(8px + env(safe-area-inset-left));
     right: calc(8px + env(safe-area-inset-right));
   }
@@ -1166,13 +1181,13 @@
   .dtp .dtp-chip, .dtp .dtp-now { font-size: var(--text-sm); } /* beats `.dtp button { font: inherit }` */
 }
 
-/* the sheet drops down from the top on mobile */
+/* the sheet rises up from the bottom on mobile */
 @media (max-width: 768px) {
-  @keyframes panel-in-top {
-    from { opacity: 0; translate: 0 -24px; }
+  @keyframes panel-in-bottom {
+    from { opacity: 0; translate: 0 24px; }
     to { opacity: 1; translate: 0 0; }
   }
-  .panel.entered { animation-name: panel-in-top; }
+  .panel.entered { animation-name: panel-in-bottom; }
 }
 
 /* reduced motion: keep fades, drop movement and loops. The loading screen keeps a near-

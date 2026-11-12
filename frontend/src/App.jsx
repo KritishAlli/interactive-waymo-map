@@ -155,7 +155,7 @@ function App() {
     );
   }
 
-  // mobile: the search card is a pull-down sheet that can be swiped up out of the way
+  // mobile: the search card is a bottom sheet; swipe up to expand it, down to tuck it away
   const [sheetOpen, setSheetOpen] = useState(true);
   const sheetRef = useRef();
   const sheetDragRef = useRef(null);
@@ -190,8 +190,8 @@ function App() {
     // follow the finger toward the next state, resist the other way
     const el = sheetRef.current;
     const offset = sheetOpen
-      ? (dy < 0 ? Math.max(dy, -el.offsetHeight * 0.6) : dy * 0.15)
-      : (dy > 0 ? Math.min(dy * 0.4, 60) : dy * 0.15);
+      ? (dy > 0 ? Math.min(dy, el.offsetHeight * 0.6) : dy * 0.15)
+      : (dy < 0 ? Math.max(dy * 0.4, -60) : dy * 0.15);
     el.style.transform = `translateY(${offset}px)`;
   }
 
@@ -202,10 +202,10 @@ function App() {
     const el = sheetRef.current;
     el.style.transition = '';
     el.style.transform = '';
-    if (sheetOpen && d.dy < -40) {
+    if (sheetOpen && d.dy > 40) {
       document.activeElement?.blur?.(); // drop the keyboard with the sheet
       setSheetOpen(false);
-    } else if (!sheetOpen && d.dy > 30) {
+    } else if (!sheetOpen && d.dy < -30) {
       setSheetOpen(true);
     }
   }
@@ -443,7 +443,7 @@ function App() {
     map.fitBounds(bounds, {
       // on mobile the sheet collapses to a one-line summary once the route is drawn
       padding: isNarrow
-        ? { top: 130, bottom: 80, left: 40, right: 40 }
+        ? { top: 80, bottom: 150, left: 40, right: 40 }
         : { top: 80, bottom: 80, left: panelInset() + 60, right: 80 },
       maxZoom: 15,
     });
@@ -819,7 +819,13 @@ function App() {
       syncProximity();
       mapRef.current.on('moveend', syncProximity);
 
-      // panning the map on a phone tucks the sheet away, like most map apps
+      // panning or tapping the map on a phone tucks the sheet away, like most map apps
+      mapRef.current.on('click', () => {
+        if (isNarrowScreen()) {
+          document.activeElement?.blur?.();
+          setSheetOpen(false);
+        }
+      });
       mapRef.current.on('dragstart', () => {
         if (isNarrowScreen()) {
           document.activeElement?.blur?.();
@@ -836,8 +842,8 @@ function App() {
         mapRef.current.flyTo({
           center: e.result.center,
           zoom: 14,
-          // on a phone the search card covers the top of the map; center the pin in what's left
-          offset: narrow ? [0, (sheetRef.current?.offsetHeight || 0) / 2] : [panelInset() / 2, 0],
+          // on a phone the search card covers the bottom of the map; center the pin in what's left
+          offset: narrow ? [0, -(sheetRef.current?.offsetHeight || 0) / 2] : [panelInset() / 2, 0],
       });
       if (mapRef.current.getSource('closest-point-route')) {
         mapRef.current.removeLayer('line-dashed');
