@@ -659,7 +659,6 @@ function App() {
   }, [theme, mapReady]);
 
   useEffect(() => {
-    document.title = "Waymo Trip Calculator";
     mapboxgl.accessToken = API_KEY;
     
 
@@ -890,7 +889,7 @@ function App() {
           onAnimationEnd={(e) => { if (e.animationName === "loading-out") setLoadingGone(true); }}
         >
           {/* not an h1: the panel title below is the page's single h1 */}
-          <div className="loading-title">Waymo Trip Calculator</div>
+          <div className="loading-title">Waymo Fare Calculator</div>
           <div className="loading-bar"><span /></div>
           <div className="loading-text">
             {slowLoad
@@ -931,7 +930,7 @@ function App() {
         onTouchCancel={onSheetTouchEnd}
       >
         <header className="panel-header">
-          <h1 className="brand-title">Waymo Trip Calculator</h1>
+          <h1 className="brand-title">Waymo Fare Calculator</h1>
           {/* keyed on mode so the new line fades in when the tab changes */}
           <p className="brand-tagline" key={mode}>
             {mode === "route"
