@@ -12,6 +12,11 @@ const RATES = {
 
 // departAt is a wall-clock "YYYY-MM-DDTHH:mm" string in the trip's local time.
 // Returns { multiplier, label } for that day/hour.
+//
+// Windows follow Obi's rideshare pricing reports (SF, Mar-Apr 2025 and Jan 2026):
+// Waymo prices peak 4-6 pm (highest 5-6 pm) and bottom out around 5-6 am. Those reports
+// show no clear morning peak, so the morning commute gets only a small bump. The weekend
+// night window is not covered by that data and remains a guess.
 function getTimeMultiplier(departAt) {
     const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(departAt || "");
     if (!match) return { multiplier: 1.0, label: "Standard" };
@@ -21,16 +26,19 @@ function getTimeMultiplier(departAt) {
     const hour = h;
     const isWeekday = day >= 1 && day <= 5;
 
-    if (isWeekday && ((hour >= 7 && hour < 10) || (hour >= 16 && hour < 19))) {
-        return { multiplier: 1.3, label: "Rush hour" };
+    if (isWeekday && hour >= 16 && hour < 18) {
+        return { multiplier: 1.3, label: "Evening peak" };
+    }
+    if (isWeekday && hour >= 7 && hour < 9) {
+        return { multiplier: 1.1, label: "Morning commute" };
     }
     const isFriSatNight = (day === 5 || day === 6) && hour >= 21;
     const isSatSunEarly = (day === 6 || day === 0) && hour < 3;
     if (isFriSatNight || isSatSunEarly) {
         return { multiplier: 1.2, label: "Weekend night" };
     }
-    if (hour >= 0 && hour < 5) {
-        return { multiplier: 0.9, label: "Late night" };
+    if (hour >= 4 && hour < 7) {
+        return { multiplier: 0.9, label: "Early morning" };
     }
     return { multiplier: 1.0, label: "Standard" };
 }

@@ -7,16 +7,20 @@ const turf = require("@turf/turf");
 const router = express.Router();
 
 const { isPointInBound , getDistance, isPointInAnyBound, getClosestPolygonPoint, getMidpoint, getTwoPointDistance} = require("../services/logic.cjs");
+const FareReport = require('../models/FareReport.cjs');
 const { estimateFare } = require("../services/pricing.cjs");
 // active service areas, cached in memory so pricing requests skip the MongoDB round trip
 const AREA_CACHE_MS = 5 * 60 * 1000;
-let areaCache = { at: 0, coords: null };
-async function getActiveAreaCoords() {
-  if (!areaCache.coords || Date.now() - areaCache.at > AREA_CACHE_MS) {
-    const serviceAreas = await ServiceArea.find({ is_active: true }, { coordinates: true });
-    areaCache = { at: Date.now(), coords: serviceAreas.map((area) => area.coordinates) };
+let areaCache = { at: 0, areas: null };
+async function getActiveAreas() {
+  if (!areaCache.areas || Date.now() - areaCache.at > AREA_CACHE_MS) {
+    const serviceAreas = await ServiceArea.find({ is_active: true }, { city: true, coordinates: true });
+    areaCache = { at: Date.now(), areas: serviceAreas.map(({ city, coordinates }) => ({ city, coordinates })) };
   }
-  return areaCache.coords;
+  return areaCache.areas;
+}
+async function getActiveAreaCoords() {
+  return (await getActiveAreas()).map((area) => area.coordinates);
 }
 
 router.post("/check", async (req, res) => {
@@ -32,7 +36,7 @@ router.post("/check", async (req, res) => {
 router.post("/service-areas", async (req, res) => {
   const newArea = new ServiceArea(req.body);
   await newArea.save();
-  areaCache.coords = null; // pick up the new area on the next request
+  areaCache.areas = null; // pick up the new area on the next request
   res.status(201).json(newArea);  
 })
 // get all service areas
@@ -87,5 +91,42 @@ router.post("/estimate-price", async (req, res) => {
     durationMinutes,
     ...estimateFare(distanceMiles, durationMinutes, departAt),
   });
+})
+
+// a user reports what they actually paid for an estimated trip. The estimate is recomputed
+// here (not taken from the client) so every report records what the model predicted.
+router.post("/fare-reports", async (req, res) => {
+  const { pickup, dropoff, distanceMiles, durationMinutes, departAt, paid } = req.body;
+  const validCoord = (c) => Array.isArray(c) && c.length === 2 && c.every(Number.isFinite);
+  const when = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(typeof departAt === "string" ? departAt : "");
+  if (!validCoord(pickup) || !validCoord(dropoff) || !when ||
+      !Number.isFinite(distanceMiles) || distanceMiles <= 0 || distanceMiles > 200 ||
+      !Number.isFinite(durationMinutes) || durationMinutes <= 0 || durationMinutes > 600 ||
+      !Number.isFinite(paid) || paid < 1 || paid > 500) {
+    return res.status(400).json({ error: "Invalid fare report" });
+  }
+
+  const [, y, m, d, h] = when.map(Number);
+  const areas = await getActiveAreas();
+  const pickupArea = areas.find((area) => isPointInAnyBound(pickup[0], pickup[1], [area.coordinates]));
+  const fare = estimateFare(distanceMiles, durationMinutes, departAt);
+
+  await FareReport.create({
+    paid: Math.round(paid * 100) / 100,
+    city: pickupArea ? pickupArea.city : null,
+    pickup,
+    dropoff,
+    distanceMiles,
+    durationMinutes,
+    departAt,
+    dayOfWeek: new Date(y, m - 1, d).getDay(),
+    hour: h,
+    estimate: fare.estimate,
+    estimateLow: fare.low,
+    estimateHigh: fare.high,
+    multiplier: fare.multiplier,
+    timeLabel: fare.timeLabel,
+  });
+  res.status(201).json({ ok: true });
 })
 module.exports = router;

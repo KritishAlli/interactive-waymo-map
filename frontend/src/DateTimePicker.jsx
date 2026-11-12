@@ -185,7 +185,7 @@ function Clock({ value, onChange }) {
   );
 }
 
-export default function DateTimePicker({ value, onChange }) {
+export default function DateTimePicker({ value, onChange, label = "Departure" }) {
   const [open, setOpen] = useState(null); // null | 'date' | 'time'
   const { y, mo, d, h, mi } = parseValue(value);
 
@@ -202,7 +202,7 @@ export default function DateTimePicker({ value, onChange }) {
 
   return (
     <div className="dtp" onKeyDown={(e) => { if (e.key === 'Escape') setOpen(null); }}>
-      <div className="dtp-label">Departure</div>
+      <div className="dtp-label">{label}</div>
       <div className="dtp-chips">
         <button type="button" className={`dtp-chip${open === 'date' ? ' open' : ''}`} onClick={() => toggle('date')} aria-expanded={open === 'date'}>
           <CalendarIcon /><span>{dateText}</span>

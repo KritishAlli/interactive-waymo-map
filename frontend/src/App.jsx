@@ -10,6 +10,7 @@ import { prepareAreas, snapTrip, checkRoute, areaSqMiles } from './geo.js'
 import LocateControl, { getPosition, locationErrorMessage } from './locate.js'
 import { tween, tweenPaint, drawLine, startRouteCar, pulseMarker, dropIn, pointAlongLine } from './animations.js'
 import AnimatedNumber from './AnimatedNumber.jsx'
+import FareReport from './FareReport.jsx'
 import { XMarkIcon } from '@heroicons/react/20/solid'
 import { MapPinIcon } from '@heroicons/react/24/outline'
 
@@ -1050,6 +1051,8 @@ function App() {
               </dl>
 
               <p className="route-disclaimer">Unofficial estimate, not Waymo pricing.</p>
+
+              <FareReport estimate={estimate} departAt={departAt} />
             </div>
           )}
         </div>
