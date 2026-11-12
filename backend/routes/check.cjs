@@ -18,8 +18,21 @@ async function getActiveAreas() {
   return areaCache.areas;
 }
 
-// add service areas
-router.post("/service-areas", async (req, res) => {
+// Writes need the ADMIN_KEY env var sent as an "x-admin-key" header. If ADMIN_KEY isn't
+// set, every write is refused.
+const crypto = require("crypto");
+function requireAdmin(req, res, next) {
+  const expected = process.env.ADMIN_KEY;
+  const given = req.get("x-admin-key");
+  if (!expected || typeof given !== "string") return res.status(401).json({ error: "Unauthorized" });
+  // compare hashes so lengths match and the check takes the same time either way
+  const hash = (s) => crypto.createHash("sha256").update(s).digest();
+  if (!crypto.timingSafeEqual(hash(given), hash(expected))) return res.status(401).json({ error: "Unauthorized" });
+  next();
+}
+
+// add service areas (admin only)
+router.post("/service-areas", requireAdmin, async (req, res) => {
   const newArea = new ServiceArea(req.body);
   await newArea.save();
   areaCache.areas = null; // pick up the new area on the next request

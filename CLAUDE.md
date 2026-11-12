@@ -47,6 +47,8 @@ There is no test suite anywhere in the repo.
 
 `backend/.env`:
 - `MONGODB_CONNECTION_STRING` — Mongo connection URI
+- `ADMIN_KEY` — secret required as an `x-admin-key` header on `POST /api/service-areas`;
+  if unset, that route refuses every request
 
 ## Architecture notes
 
