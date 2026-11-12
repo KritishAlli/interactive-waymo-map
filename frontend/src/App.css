@@ -857,6 +857,51 @@
 }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
+/* ---------- about + FAQ ---------- */
+.about {
+  margin-top: var(--space-3);
+  padding: 0 var(--space-1);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.about .section-title { padding: 0; }
+.about p { margin: 0 0 var(--space-3); }
+.about-subtitle {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+.about-uses { margin: 0; padding-left: var(--space-5); }
+.about-uses li + li { margin-top: var(--space-1); }
+.about-faq-title { margin-top: var(--space-5) !important; }
+.faq details { border-bottom: 1px solid var(--border); }
+.faq details:first-child { border-top: 1px solid var(--border); }
+.faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: "+";
+  flex: none;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+  transition: transform 0.2s var(--ease);
+}
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.faq details p { margin: 0 0 var(--space-3); }
+
 .panel-footer {
   padding: var(--space-2) var(--space-2) 0;
   font-size: var(--text-xs);
@@ -1121,6 +1166,7 @@
   /* the sheet keeps only the controls; the city chips stand in for the city list */
   .panel-header,
   .city-list,
+  .about,
   .panel-footer { display: none; }
 
   /* 44px touch targets (Apple HIG / Material minimum) */

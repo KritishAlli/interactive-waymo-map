@@ -17,6 +17,7 @@ import LocateControl, { getPosition, locationErrorMessage } from './locate.js'
 import { tween, tweenPaint, drawLine, startRouteCar, pulseMarker, dropIn, pointAlongLine } from './animations.js'
 import AnimatedNumber from './AnimatedNumber.jsx'
 import FareReport from './FareReport.jsx'
+import About from './About.jsx'
 import { XMarkIcon } from '@heroicons/react/20/solid'
 import { MapPinIcon } from '@heroicons/react/24/outline'
 
@@ -1087,6 +1088,8 @@ function App() {
             ))}
           </ul>
         </section>
+
+        <About />
 
         <footer className="panel-footer">
           Unofficial project. Not affiliated with Waymo.
