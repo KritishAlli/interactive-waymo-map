@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 
-// Light/dark theme. Follows the system setting until the user picks one with the toggle;
-// the pick is remembered. index.html sets data-theme before first paint (same rules as
-// resolveTheme) so the page never flashes the wrong theme.
+// Light/dark theme. Light is the default regardless of the system setting; dark mode is
+// opt-in with the toggle, and the pick is remembered. index.html sets data-theme before
+// first paint (same rules as resolveTheme) so the page never flashes the wrong theme.
 
 const STORAGE_KEY = 'theme';
-const darkQuery = () => window.matchMedia('(prefers-color-scheme: dark)');
 
 function storedTheme() {
   try {
@@ -17,7 +16,7 @@ function storedTheme() {
 }
 
 function resolveTheme() {
-  return storedTheme() ?? (darkQuery().matches ? 'dark' : 'light');
+  return storedTheme() ?? 'light';
 }
 
 // the theme currently on the page; imperative map code reads this
@@ -33,19 +32,11 @@ export function useTheme() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
   }, [theme]);
 
-  // follow system changes unless the user has picked a theme
-  useEffect(() => {
-    const mq = darkQuery();
-    const onChange = () => { if (!storedTheme()) setTheme(mq.matches ? 'dark' : 'light'); };
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
     try {
-      // picking the system theme again goes back to following the system
-      if (next === (darkQuery().matches ? 'dark' : 'light')) localStorage.removeItem(STORAGE_KEY);
+      // light is the default, so only a dark pick needs remembering
+      if (next === 'light') localStorage.removeItem(STORAGE_KEY);
       else localStorage.setItem(STORAGE_KEY, next);
     } catch { /* storage blocked: the toggle still works for this visit */ }
     setTheme(next);
