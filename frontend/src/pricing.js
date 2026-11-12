@@ -38,10 +38,12 @@ export function ratesForCity(city) {
 //
 // Windows follow Obi's rideshare pricing reports (SF, Mar-Apr 2025 and Jan 2026):
 // Waymo prices peak 4-6 pm (highest 5-6 pm) and bottom out around 5-6 am. Those reports
-// show no clear morning peak, so the morning commute gets only a small bump. The weekend
-// night premium comes from the tracker data: its 14 weekend-night rides cost ~5% more than
-// their city's fit predicts. (The tracker has only 8 rides in the 4-6 pm window, too few to
-// overrule Obi's reports on the evening peak.)
+// show no clear morning peak, so the morning commute gets only a small bump. (The tracker
+// has only 8 rides in the 4-6 pm window, too few to overrule Obi's reports on the evening
+// peak.)
+//
+// Night (10 pm-5 am, every day) is priced at half: a deliberate product choice, not fitted
+// to data. The tracker's rides in those hours cost about as much as daytime ones.
 export function getTimeMultiplier(departAt) {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(departAt || "");
   if (!match) return { multiplier: 1.0, label: "Standard" };
@@ -57,12 +59,10 @@ export function getTimeMultiplier(departAt) {
   if (isWeekday && hour >= 7 && hour < 9) {
     return { multiplier: 1.1, label: "Morning commute" };
   }
-  const isFriSatNight = (day === 5 || day === 6) && hour >= 21;
-  const isSatSunEarly = (day === 6 || day === 0) && hour < 3;
-  if (isFriSatNight || isSatSunEarly) {
-    return { multiplier: 1.05, label: "Weekend night" };
+  if (hour >= 22 || hour < 5) {
+    return { multiplier: 0.5, label: "Night" };
   }
-  if (hour >= 4 && hour < 7) {
+  if (hour >= 5 && hour < 7) {
     return { multiplier: 0.9, label: "Early morning" };
   }
   return { multiplier: 1.0, label: "Standard" };
