@@ -805,6 +805,95 @@
   animation: pop-in 0.4s var(--ease) var(--anim-delay, 0ms) both;
 }
 
+/* fare + distance callout pinned to the middle of a planned route, with a tail pointing at it.
+   Sequence: a ripple spreads on the line, the card springs up out of it, a shine sweeps
+   across while the price ticks up (JS), then it stays put. */
+.fare-callout-wrap {
+  z-index: 2; /* above the route car as it drives past */
+  pointer-events: none;
+}
+.fare-callout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 104px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform-origin: 50% calc(100% + 8px); /* the point on the route */
+  animation: callout-spring 0.75s var(--anim-delay, 0ms) both;
+}
+@keyframes callout-spring {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.2); filter: blur(4px); }
+  45%  { opacity: 1; transform: translateY(-6px) scale(1.08); filter: blur(0); }
+  70%  { transform: translateY(2px) scale(0.97); }
+  100% { opacity: 1; transform: none; }
+}
+/* one light sweep across the card after it lands */
+.fare-callout-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+}
+.fare-callout-shine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgb(0 194 168 / 0.22) 50%, transparent 70%);
+  transform: translateX(-110%);
+  animation: sweep 0.9s var(--ease) calc(var(--anim-delay, 0ms) + 0.45s) both;
+}
+/* ring that spreads along the route where the tail touches it */
+.fare-callout-ripple {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;            /* the marker offset: this is the point on the route */
+  width: 56px;
+  height: 56px;
+  margin: 0 0 -28px -28px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-bright);
+  opacity: 0;
+  animation: callout-ripple 0.9s var(--ease) var(--anim-delay, 0ms) both;
+}
+@keyframes callout-ripple {
+  0% { opacity: 0; transform: scale(0.1); } /* invisible while waiting for its delay */
+  10% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+.fare-callout strong {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--accent-text);
+}
+.fare-callout-meta {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+.fare-callout::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: inherit;
+  transform: rotate(45deg);
+  border-radius: 0 0 3px 0;
+}
+
 /* pins drop from above and squash on landing; animates the inner SVG because Mapbox
    owns the marker element's transform */
 .marker-drop svg {

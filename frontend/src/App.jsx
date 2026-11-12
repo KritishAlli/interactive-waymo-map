@@ -8,7 +8,7 @@ import './App.css'
 import DateTimePicker from './DateTimePicker.jsx'
 import { prepareAreas, snapTrip, checkRoute, areaSqMiles } from './geo.js'
 import LocateControl, { getPosition, locationErrorMessage } from './locate.js'
-import { tweenPaint, drawLine, startRouteCar, pulseMarker, dropIn } from './animations.js'
+import { tween, tweenPaint, drawLine, startRouteCar, pulseMarker, dropIn, pointAlongLine } from './animations.js'
 import AnimatedNumber from './AnimatedNumber.jsx'
 import { XMarkIcon } from '@heroicons/react/20/solid'
 import { MapPinIcon } from '@heroicons/react/24/outline'
@@ -97,6 +97,7 @@ function App() {
   const dashAnimationRef = useRef();
   const currentPulseRef = useRef();
   const routeAnimCancelsRef = useRef([]); // cancel fns for the route draw + car loop
+  const routeDrawnRef = useRef(null); // { coords, drawEndsAt } of the route on the map
   const [loadingGone, setLoadingGone] = useState(false); // loading screen finished fading out
 
   // route price estimation mode
@@ -219,6 +220,7 @@ function App() {
   function setAreaHighlight(city, on) {
     const map = mapRef.current;
     if (!map?.getLayer('fill-' + city)) return;
+    if (on && routeDrawnRef.current) return; // no teal hover wash while a route is on the map
     map.setPaintProperty('fill-' + city, 'fill-opacity', on ? AREA_STYLE.fillOpacityHover : AREA_STYLE.fillOpacity);
     map.setPaintProperty('outline-' + city, 'line-width', on ? AREA_STYLE.lineWidthHover : AREA_STYLE.lineWidth);
     map.setPaintProperty('outline-' + city, 'line-color', on ? AREA_STYLE.lineColorHover : AREA_STYLE.lineColor);
@@ -257,6 +259,7 @@ function App() {
     routeAnimCancelsRef.current = [];
     routeMarkersRef.current.forEach((m) => m.remove());
     routeMarkersRef.current = [];
+    routeDrawnRef.current = null;
     const map = mapRef.current;
     for (const id of ['route-line', 'route-casing', 'route-gaps-line']) {
       if (map?.getLayer(id)) map.removeLayer(id);
@@ -391,6 +394,8 @@ function App() {
     });
     const DRAW_MS = 1400;
     const coords = route.geometry.coordinates;
+    routeDrawnRef.current = { coords, drawEndsAt: performance.now() + 250 + DRAW_MS };
+    CITIES.forEach((c) => setAreaHighlight(c.name, false)); // drop a highlight the cursor left on
     routeAnimCancelsRef.current.push(
       drawLine(map, ['route-casing', 'route-line'], DRAW_MS, {
         delay: 250,
@@ -605,6 +610,45 @@ function App() {
       offset: [panelInset() / 2, 0],
     });
   }
+
+  // fare callout on the middle of the route; follows `estimate`, so it goes away as soon as
+  // the estimate is cleared (edited addresses/time, tab switch, re-estimating)
+  useEffect(() => {
+    const drawn = routeDrawnRef.current;
+    if (!estimate || !drawn || !mapRef.current) return;
+    // Mapbox owns the outer element's transform, so the card animates inside a wrapper:
+    //   .fare-callout-wrap > .fare-callout (card: shine + price + meta + tail) + .fare-callout-ripple
+    const wrap = document.createElement("div");
+    wrap.className = "fare-callout-wrap";
+    const card = document.createElement("div");
+    card.className = "fare-callout";
+    const shine = document.createElement("span");
+    shine.className = "fare-callout-shine";
+    const price = document.createElement("strong");
+    const meta = document.createElement("span");
+    meta.className = "fare-callout-meta";
+    meta.textContent = `${estimate.distanceMiles.toFixed(1)} mi · ${Math.round(estimate.durationMinutes)} min`;
+    card.append(shine, price, meta);
+    const ripple = document.createElement("span");
+    ripple.className = "fare-callout-ripple";
+    wrap.append(ripple, card);
+
+    // spring up once the line has drawn past the middle
+    const delay = Math.max(0, drawn.drawEndsAt - performance.now() - 500);
+    wrap.style.setProperty('--anim-delay', `${delay}ms`);
+
+    // price ticks up from $0 as the card lands
+    const setPrice = (t) => {
+      price.textContent = `$${(estimate.low * t).toFixed(0)}–$${(estimate.high * t).toFixed(0)}`;
+    };
+    setPrice(0);
+    const cancelCount = tween(800, setPrice, { delay: delay + 150 });
+
+    const marker = new mapboxgl.Marker({ element: wrap, anchor: 'bottom', offset: [0, -8] })
+      .setLngLat(pointAlongLine(drawn.coords, 0.5))
+      .addTo(mapRef.current);
+    return () => { cancelCount(); marker.remove(); };
+  }, [estimate]);
 
   useEffect(() => {
     let cancelled = false;

@@ -76,6 +76,11 @@ function pointAlong(coords, lengths, fraction) {
   ];
 }
 
+// the point `fraction` (0..1) of the way along a line, by distance
+export function pointAlongLine(coords, fraction) {
+  return pointAlong(coords, cumulativeLengths(coords), fraction);
+}
+
 // a glowing dot that drives the route on a loop, like a Waymo on its way
 export function startRouteCar(map, coords, { lapMs = 4200, pauseMs = 900 } = {}) {
   if (prefersReducedMotion() || coords.length < 2) return () => {};
