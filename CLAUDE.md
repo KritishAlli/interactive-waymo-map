@@ -31,6 +31,8 @@ reports, and the page pings `/health` on load to start waking it.
 - `npm run lint` — ESLint (flat config in `eslint.config.js`)
 - `python3 scripts/gen_og.py` — regenerate `public/og-image.png` (link-preview image) with
   headless Chrome. Its sample fare is hardcoded; re-price it if `pricing.js` rates change.
+- `python3 scripts/gen_icons.py` — regenerate the PNG/ICO favicons from `public/favicon.svg`
+  (run after changing the SVG; macOS only, uses `sips`).
 
 ### Backend (`cd backend`)
 - `node index.cjs` — start the API on port **3001** (hardcoded in `index.cjs`; no start
