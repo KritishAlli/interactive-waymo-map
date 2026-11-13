@@ -17,16 +17,23 @@
 // distance, which a model with no base fare can't capture well (R² ~0): expect short
 // Phoenix trips to be underestimated and long ones overestimated. Re-fit when more rides
 // are reported.
+//
+// Los Angeles is fitted to this site's own fare reports instead (6 reports, Nov 2026,
+// night ones included at multiplier 1.0 since they cost the same as daytime). They paid
+// ~$15-21 for 4-14.5 mile trips, less than half what 2024-25 tracker riders paid for
+// similar distances ($2.17/mi, $0.28/min on 23 rides), so LA prices appear to have
+// dropped. LA fares were nearly flat with distance, which this model can't capture
+// (R² < 0): short LA trips are underestimated. Re-fit as more LA reports come in.
 export const CITY_RATES = {
   //                    $/mile  $/minute        fit: n, R²
   "San Francisco Bay": { perMile: 1.52, perMinute: 0.56 }, // n=40, R² 0.50
-  "Los Angeles":       { perMile: 2.17, perMinute: 0.28 }, // n=23, R² 0.74
+  "Los Angeles":       { perMile: 0.73, perMinute: 0.24 }, // n=6 site reports, MAE $3.69
   "Phoenix":           { perMile: 1.28, perMinute: 0.30 }, // n=34, R² -0.02
 };
 
 // Cities with no ride data yet (Dallas, San Diego, new areas): the average of the three
 // fitted cities. A guess until rides from those cities are reported.
-export const DEFAULT_RATES = { perMile: 1.66, perMinute: 0.38 };
+export const DEFAULT_RATES = { perMile: 1.18, perMinute: 0.37 };
 
 export const FEES = {
   bookingFee: 2.50,    // flat fee added after the time-of-day multiplier ($)
